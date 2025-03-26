@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Marketplace</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="logo">
+                <h1><i class="fas fa-shopping-cart"></i> Digital Marketplace</h1>
+            </div>
+            <nav>
+                <ul id="nav-menu">
+                    <li><a href="#" class="nav-link" data-page="home">Home</a></li>
+                    <li><a href="#" class="nav-link" data-page="browse">Browse</a></li>
+                    <li id="sell-link" class="auth-required hidden"><a href="#" class="nav-link" data-page="sell">Sell</a></li>
+                    <li id="alerts-link" class="auth-required hidden"><a href="#" class="nav-link" data-page="alerts">Alerts <span id="alert-badge" class="badge hidden">0</span></a></li>
+                    <li id="login-link"><a href="#" class="nav-link" data-page="login">Login</a></li>
+                    <li id="register-link"><a href="#" class="nav-link" data-page="register">Register</a></li>
+                    <li id="profile-link" class="auth-required hidden"><a href="#" class="nav-link" data-page="profile">Profile</a></li>
+                    <li id="logout-link" class="auth-required hidden"><a href="#" class="nav-link" data-action="logout">Logout</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <div id="alert-container"></div>
+        <div id="page-content"></div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Digital Marketplace</p>
+        </div>
+    </footer>
+
+    <!-- Templates -->
+    <!-- Home Page Template -->
+    <template id="home-template">
+        <section class="hero">
+            <div class="hero-content">
+                <h2>Digital Marketplace</h2>
+                <p>Buy and sell digital products with ease</p>
+                <div class="cta-buttons">
+                    <button class="btn btn-primary" data-action="browse">Browse Items</button>
+                    <button class="btn btn-secondary auth-required hidden" data-action="sell">Sell Your Item</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="featured-items">
+            <h2>Featured Items</h2>
+            <div class="items-grid" id="featured-items-container">
+                <!-- Items will be loaded dynamically -->
+                <div class="loading">Loading...</div>
+            </div>
+        </section>
+
+        <section class="categories">
+            <h2>Browse by Category</h2>
+            <div class="category-grid" id="categories-container">
+                <!-- Categories will be loaded dynamically -->
+                <div class="loading">Loading...</div>
+            </div>
+        </section>
+    </template>
+
+    <!-- Browse Page Template -->
+    <template id="browse-template">
+        <section class="browse-section">
+            <h2>Browse Digital Items</h2>
+            
+            <div class="filters">
+                <div class="search-bar">
+                    <input type="text" id="search-input" placeholder="Search for items...">
+                    <button id="search-button" class="btn btn-primary"><i class="fas fa-search"></i></button>
+                </div>
+                
+                <div class="category-filter">
+                    <select id="category-filter">
+                        <option value="">All Categories</option>
+                        <!-- Categories will be loaded dynamically -->
+                    </select>
+                </div>
+            </div>
+            
+            <div class="items-grid" id="browse-items-container">
+                <!-- Items will be loaded dynamically -->
+                <div class="loading">Loading...</div>
+            </div>
+        </section>
+    </template>
+
+    <!-- Item Detail Template -->
+    <template id="item-detail-template">
+        <section class="item-detail">
+            <div class="item-header">
+                <button class="btn btn-secondary" id="back-button"><i class="fas fa-arrow-left"></i> Back</button>
+                <h2 id="item-title">Item Title</h2>
+            </div>
+            
+            <div class="item-content">
+                <div class="item-image">
+                    <img id="item-thumbnail" src="" alt="Item Thumbnail">
+                </div>
+                
+                <div class="item-info">
+                    <p id="item-description">Description</p>
+                    
+                    <div class="item-meta">
+                        <p><strong>Category:</strong> <span id="item-category">Category</span></p>
+                        <p><strong>Seller:</strong> <span id="item-seller">Seller</span></p>
+                        <p><strong>Price:</strong> <span id="item-price">$0.00</span></p>
+                    </div>
+                    
+                    <div class="item-actions">
+                        <button id="purchase-button" class="btn btn-primary auth-required hidden">Purchase</button>
+                        <button id="set-alert-button" class="btn btn-secondary auth-required hidden">Set Price Alert</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="item-reviews">
+                <h3>Reviews</h3>
+                <div id="reviews-container">
+                    <!-- Reviews will be loaded dynamically -->
+                </div>
+                
+                <div class="add-review auth-required hidden">
+                    <h4>Add a Review</h4>
+                    <form id="review-form">
+                        <div class="rating-select">
+                            <span>Rating: </span>
+                            <div class="star-rating">
+                                <i class="fas fa-star" data-rating="1"></i>
+                                <i class="fas fa-star" data-rating="2"></i>
+                                <i class="fas fa-star" data-rating="3"></i>
+                                <i class="fas fa-star" data-rating="4"></i>
+                                <i class="fas fa-star" data-rating="5"></i>
+                            </div>
+                            <input type="hidden" id="rating-input" value="5">
+                        </div>
+                        
+                        <div class="form-group">
+                            <textarea id="review-comment" rows="3" placeholder="Write your review..."></textarea>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Submit Review</button>
+                    </form>
+                </div>
+            </div>
+        </section>
+    </template>
+
+    <!-- Login Template -->
+    <template id="login-template">
+        <section class="auth-section">
+            <h2>Login</h2>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="login-email">Email</label>
+                    <input type="email" id="login-email" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" required>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Login</button>
+            </form>
+            
+            <p>Don't have an account? <a href="#" class="nav-link" data-page="register">Register</a></p>
+        </section>
+    </template>
+
+    <!-- Register Template -->
+    <template id="register-template">
+        <section class="auth-section">
+            <h2>Register</h2>
+            <form id="register-form">
+                <div class="form-group">
+                    <label for="register-username">Username</label>
+                    <input type="text" id="register-username" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="register-email">Email</label>
+                    <input type="email" id="register-email" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="register-full-name">Full Name</label>
+                    <input type="text" id="register-full-name">
+                </div>
+                
+                <div class="form-group">
+                    <label for="register-password">Password</label>
+                    <input type="password" id="register-password" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="register-confirm-password">Confirm Password</label>
+                    <input type="password" id="register-confirm-password" required>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Register</button>
+            </form>
+            
+            <p>Already have an account? <a href="#" class="nav-link" data-page="login">Login</a></p>
+        </section>
+    </template>
+
+    <!-- Profile Template -->
+    <template id="profile-template">
+        <section class="profile-section">
+            <h2>Your Profile</h2>
+            
+            <div class="profile-content">
+                <div class="profile-image">
+                    <img id="profile-image" src="" alt="Profile Image">
+                    <form id="profile-image-form">
+                        <label for="profile-image-upload" class="btn btn-secondary">Change Image</label>
+                        <input type="file" id="profile-image-upload" accept="image/*" style="display: none;">
+                    </form>
+                </div>
+                
+                <div class="profile-info">
+                    <form id="profile-form">
+                        <div class="form-group">
+                            <label for="profile-username">Username</label>
+                            <input type="text" id="profile-username">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="profile-email">Email</label>
+                            <input type="email" id="profile-email">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="profile-full-name">Full Name</label>
+                            <input type="text" id="profile-full-name">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="profile-password">New Password (leave blank to keep current)</label>
+                            <input type="password" id="profile-password">
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Update Profile</button>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="profile-tabs">
+                <ul class="tab-nav">
+                    <li class="tab-item active" data-tab="purchases">Your Purchases</li>
+                    <li class="tab-item" data-tab="sales">Your Sales</li>
+                </ul>
+                
+                <div class="tab-content">
+                    <div id="purchases-tab" class="tab-pane active">
+                        <h3>Your Purchases</h3>
+                        <div id="purchases-container">
+                            <!-- Purchases will be loaded dynamically -->
+                            <div class="loading">Loading...</div>
+                        </div>
+                    </div>
+                    
+                    <div id="sales-tab" class="tab-pane">
+                        <h3>Your Sales</h3>
+                        <div id="sales-container">
+                            <!-- Sales will be loaded dynamically -->
+                            <div class="loading">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </template>
+
+    <!-- Sell Template -->
+    <template id="sell-template">
+        <section class="sell-section">
+            <h2>Sell a Digital Item</h2>
+            
+            <form id="sell-form">
+                <div class="form-group">
+                    <label for="item-title-input">Title</label>
+                    <input type="text" id="item-title-input" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="item-description-input">Description</label>
+                    <textarea id="item-description-input" rows="5" required></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="item-price-input">Price ($)</label>
+                    <input type="number" id="item-price-input" min="0.01" step="0.01" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="item-category-input">Category</label>
+                    <select id="item-category-input" required>
+                        <option value="">Select a category</option>
+                        <!-- Categories will be loaded dynamically -->
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="item-file-input">File</label>
+                    <input type="file" id="item-file-input" required>
+                    <p class="help-text">Upload the digital item file (max 50MB)</p>
+                </div>
+                
+                <div class="form-group">
+                    <label for="item-thumbnail-input">Thumbnail (optional)</label>
+                    <input type="file" id="item-thumbnail-input" accept="image/*">
+                    <p class="help-text">Upload a thumbnail image for your item</p>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">List Item for Sale</button>
+            </form>
+        </section>
+    </template>
+
+    <!-- Alerts Template -->
+    <template id="alerts-template">
+        <section class="alerts-section">
+            <h2>Your Alerts</h2>
+            
+            <div class="alerts-actions">
+                <button id="new-alert-button" class="btn btn-primary">Set New Alert</button>
+            </div>
+            
+            <div id="alerts-container">
+                <!-- Alerts will be loaded dynamically -->
+                <div class="loading">Loading...</div>
+            </div>
+            
+            <!-- New Alert Modal -->
+            <div id="new-alert-modal" class="modal hidden">
+                <div class="modal-content">
+                    <span class="close-modal">&times;</span>
+                    <h3>Set New Alert</h3>
+                    
+                    <form id="new-alert-form">
+                        <div class="form-group">
+                            <label for="alert-type-input">Alert Type</label>
+                            <select id="alert-type-input" required>
+                                <option value="">Select alert type</option>
+                                <!-- Alert types will be loaded dynamically -->
+                            </select>
+                        </div>
+                        
+                        <div id="alert-item-group" class="form-group hidden">
+                            <label for="alert-item-input">Item</label>
+                            <select id="alert-item-input">
+                                <option value="">Select an item</option>
+                                <!-- Items will be loaded dynamically -->
+                            </select>
+                        </div>
+                        
+                        <div id="alert-category-group" class="form-group hidden">
+                            <label for="alert-category-input">Category</label>
+                            <select id="alert-category-input">
+                                <option value="">Select a category</option>
+                                <!-- Categories will be loaded dynamically -->
+                            </select>
+                        </div>
+                        
+                        <div id="alert-price-group" class="form-group hidden">
+                            <label for="alert-price-input">Price Threshold ($)</label>
+                            <input type="number" id="alert-price-input" min="0.01" step="0.01">
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Set Alert</button>
+                    </form>
+                </div>
+            </div>
+        </section>
+    </template>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
