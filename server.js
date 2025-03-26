@@ -26,15 +26,42 @@ app.use(fileUpload({
 
 // Create upload directories if they don't exist
 const fs = require('fs');
-const dirs = ['./public/uploads/items', './public/uploads/profiles', './public/uploads/thumbnails'];
+const dirs = [
+  './public/uploads/items', 
+  './public/uploads/profiles', 
+  './public/uploads/thumbnails',
+  './public/img'
+];
+
 dirs.forEach(dir => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
 });
 
-// Static folders
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Create default images if they don't exist
+const defaultImages = [
+  { path: './public/img', file: 'default-thumbnail.png' },
+  { path: './public/img', file: 'default-profile.png' }
+];
+
+defaultImages.forEach(img => {
+  const filePath = path.join(img.path, img.file);
+  if (!fs.existsSync(filePath)) {
+    // Create a simple SVG as placeholder
+    const placeholderSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+      <rect width="200" height="200" fill="#f1f1f1"/>
+      <text x="50%" y="50%" font-family="Arial" font-size="24" text-anchor="middle" fill="#999">
+        ${img.file.replace('.png', '')}
+      </text>
+    </svg>`;
+    
+    fs.writeFileSync(filePath, placeholderSvg);
+  }
+});
+
+// Static folders - CORRECTED PATHS
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Routes

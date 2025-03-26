@@ -14,36 +14,38 @@ const createItem = async (req, res) => {
       return res.status(400).json({ message: 'Please add all required fields' });
     }
 
-    if (!req.files || !req.files.file) {
-      return res.status(400).json({ message: 'Please upload a file' });
-    }
-
-    const file = req.files.file;
-    const thumbnail = req.files.thumbnail;
-    
-    // Generate unique filename
-    const fileName = `${uuidv4()}${path.extname(file.name)}`;
-    const filePath = `/uploads/items/${fileName}`;
-    const uploadPath = `./uploads/items/${fileName}`;
-    
-    // Create directory if it doesn't exist
-    if (!fs.existsSync('./uploads/items')) {
-      fs.mkdirSync('./uploads/items', { recursive: true });
-    }
-    
-    // Move file to uploads directory
-    await file.mv(uploadPath);
-    
-    // Handle thumbnail if provided
+    // Initialize file path variables
+    let filePath = '';  // Default to empty string instead of null
     let thumbnailPath = null;
-    if (thumbnail) {
-      const thumbnailName = `thumb_${uuidv4()}${path.extname(thumbnail.name)}`;
-      thumbnailPath = `/uploads/thumbnails/${thumbnailName}`;
-      const thumbnailUploadPath = `./uploads/thumbnails/${thumbnailName}`;
+    
+    // Handle file upload if provided
+    if (req.files && req.files.file) {
+      const file = req.files.file;
+      
+      // Generate unique filename
+      const fileName = `${uuidv4()}${path.extname(file.name)}`;
+      filePath = `/uploads/items/${fileName}`;
+      const uploadPath = `./public/uploads/items/${fileName}`;
       
       // Create directory if it doesn't exist
-      if (!fs.existsSync('./uploads/thumbnails')) {
-        fs.mkdirSync('./uploads/thumbnails', { recursive: true });
+      if (!fs.existsSync('./public/uploads/items')) {
+        fs.mkdirSync('./public/uploads/items', { recursive: true });
+      }
+      
+      // Move file to uploads directory
+      await file.mv(uploadPath);
+    }
+    
+    // Handle thumbnail if provided
+    if (req.files && req.files.thumbnail) {
+      const thumbnail = req.files.thumbnail;
+      const thumbnailName = `thumb_${uuidv4()}${path.extname(thumbnail.name)}`;
+      thumbnailPath = `/uploads/thumbnails/${thumbnailName}`;
+      const thumbnailUploadPath = `./public/uploads/thumbnails/${thumbnailName}`;
+      
+      // Create directory if it doesn't exist
+      if (!fs.existsSync('./public/uploads/thumbnails')) {
+        fs.mkdirSync('./public/uploads/thumbnails', { recursive: true });
       }
       
       await thumbnail.mv(thumbnailUploadPath);
@@ -166,6 +168,8 @@ const getItems = async (req, res) => {
 // @access  Public
 const getItemById = async (req, res) => {
   try {
+    console.log('Fetching item with ID:', req.params.id);
+    
     const [rows] = await pool.query(
       `SELECT i.*, c.name as category_name, u.username as seller_name, u.user_id as seller_id
        FROM items i
@@ -175,7 +179,10 @@ const getItemById = async (req, res) => {
       [req.params.id]
     );
     
+    console.log('Query result rows:', rows.length);
+    
     if (rows.length === 0) {
+      console.log('Item not found for ID:', req.params.id);
       return res.status(404).json({ message: 'Item not found' });
     }
     
@@ -193,9 +200,10 @@ const getItemById = async (req, res) => {
       reviews
     };
     
+    console.log('Sending item data to client');
     res.json(item);
   } catch (error) {
-    console.error(error);
+    console.error('Error in getItemById:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };

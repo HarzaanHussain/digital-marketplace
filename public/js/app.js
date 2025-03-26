@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.preventDefault();
                 const page = e.target.dataset.page;
                 const action = e.target.dataset.action;
-                
+
                 if (page) {
                     navigateTo(page);
                 } else if (action === 'logout') {
@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Check for data-action
         if (e.target.dataset.action) {
             const action = e.target.dataset.action;
-            
+
             switch (action) {
                 case 'browse':
                     navigateTo('browse');
@@ -105,17 +105,17 @@ document.addEventListener('DOMContentLoaded', () => {
     function navigateTo(page, params = {}) {
         state.currentPage = page;
         state.params = params;
-        
+
         // Update URL hash
         window.location.hash = page;
-        
+
         // Clear page content
         const pageContent = document.getElementById('page-content');
         pageContent.innerHTML = '';
-        
+
         // Load page content
         loadPage(page, params);
-        
+
         // Update active nav link
         updateActiveNavLink(page);
     }
@@ -134,43 +134,43 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load page content
     async function loadPage(page, params = {}) {
         const pageContent = document.getElementById('page-content');
-        
+
         switch (page) {
             case 'home':
                 renderTemplate('home-template', pageContent);
                 loadFeaturedItems();
                 loadCategories();
                 break;
-                
+
             case 'browse':
                 renderTemplate('browse-template', pageContent);
                 loadCategories();
-                
+
                 const searchButton = document.getElementById('search-button');
                 searchButton.addEventListener('click', () => {
                     const searchInput = document.getElementById('search-input').value;
                     loadItems({ search: searchInput });
                 });
-                
+
                 const categoryFilter = document.getElementById('category-filter');
                 categoryFilter.addEventListener('change', () => {
                     loadItems({ category: categoryFilter.value });
                 });
-                
+
                 // Load items with initial params
                 loadItems(params);
                 break;
-                
+
             case 'item':
                 renderTemplate('item-detail-template', pageContent);
                 loadItem(params.itemId);
-                
+
                 // Set up back button
                 const backButton = document.getElementById('back-button');
                 backButton.addEventListener('click', () => {
                     navigateTo('browse');
                 });
-                
+
                 // Set up review form
                 const reviewForm = document.getElementById('review-form');
                 if (reviewForm) {
@@ -179,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         submitReview(params.itemId);
                     });
                 }
-                
+
                 // Set up star rating
                 const stars = document.querySelectorAll('.star-rating i');
                 if (stars.length > 0) {
@@ -190,11 +190,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             updateStarRating(rating);
                         });
                     });
-                    
+
                     // Set initial star rating
                     updateStarRating(5);
                 }
-                
+
                 // Set up alert button
                 const setAlertButton = document.getElementById('set-alert-button');
                 if (setAlertButton) {
@@ -202,68 +202,72 @@ document.addEventListener('DOMContentLoaded', () => {
                         openSetAlertModal(params.itemId);
                     });
                 }
-                
+
                 // Set up purchase button
                 const purchaseButton = document.getElementById('purchase-button');
                 if (purchaseButton) {
                     purchaseButton.addEventListener('click', () => {
-                        purchaseItem(params.itemId);
+                        if (purchaseButton.dataset.action === 'editItem') {
+                            editItem(params.itemId);
+                        } else {
+                            purchaseItem(params.itemId);
+                        }
                     });
                 }
                 break;
-                
+
             case 'login':
                 if (state.user) {
                     navigateTo('profile');
                     return;
                 }
-                
+
                 renderTemplate('login-template', pageContent);
-                
+
                 const loginForm = document.getElementById('login-form');
                 loginForm.addEventListener('submit', (e) => {
                     e.preventDefault();
                     login();
                 });
                 break;
-                
+
             case 'register':
                 if (state.user) {
                     navigateTo('profile');
                     return;
                 }
-                
+
                 renderTemplate('register-template', pageContent);
-                
+
                 const registerForm = document.getElementById('register-form');
                 registerForm.addEventListener('submit', (e) => {
                     e.preventDefault();
                     register();
                 });
                 break;
-                
+
             case 'profile':
                 if (!state.user) {
                     navigateTo('login');
                     return;
                 }
-                
+
                 renderTemplate('profile-template', pageContent);
                 loadProfile();
-                
+
                 // Set up profile form
                 const profileForm = document.getElementById('profile-form');
                 profileForm.addEventListener('submit', (e) => {
                     e.preventDefault();
                     updateProfile();
                 });
-                
+
                 // Set up profile image upload
                 const profileImageUpload = document.getElementById('profile-image-upload');
                 profileImageUpload.addEventListener('change', () => {
                     uploadProfileImage();
                 });
-                
+
                 // Set up tabs
                 const tabItems = document.querySelectorAll('.tab-item');
                 tabItems.forEach(item => {
@@ -272,68 +276,68 @@ document.addEventListener('DOMContentLoaded', () => {
                         switchTab(tab);
                     });
                 });
-                
+
                 // Load purchases and sales
                 loadPurchases();
                 loadSales();
                 break;
-                
+
             case 'sell':
                 if (!state.user) {
                     navigateTo('login');
                     return;
                 }
-                
+
                 renderTemplate('sell-template', pageContent);
                 loadCategoriesForSell();
-                
+
                 const sellForm = document.getElementById('sell-form');
                 sellForm.addEventListener('submit', (e) => {
                     e.preventDefault();
                     sellItem();
                 });
                 break;
-                
+
             case 'alerts':
                 if (!state.user) {
                     navigateTo('login');
                     return;
                 }
-                
+
                 renderTemplate('alerts-template', pageContent);
                 loadAlerts();
-                
+
                 // Set up new alert button
                 const newAlertButton = document.getElementById('new-alert-button');
                 newAlertButton.addEventListener('click', () => {
                     openNewAlertModal();
                 });
-                
+
                 // Set up modal close
                 const closeModal = document.querySelector('.close-modal');
                 closeModal.addEventListener('click', () => {
                     closeModal();
                 });
-                
+
                 // Set up new alert form
                 const newAlertForm = document.getElementById('new-alert-form');
                 newAlertForm.addEventListener('submit', (e) => {
                     e.preventDefault();
                     createAlert();
                 });
-                
+
                 // Set up alert type change
                 const alertTypeInput = document.getElementById('alert-type-input');
                 alertTypeInput.addEventListener('change', () => {
                     updateAlertForm();
                 });
-                
+
                 // Load alert types, categories, and items for the form
                 loadAlertTypes();
                 loadCategoriesForAlerts();
                 loadItemsForAlerts();
                 break;
-                
+
             default:
                 pageContent.innerHTML = '<div class="not-found"><h2>Page Not Found</h2></div>';
         }
@@ -345,16 +349,25 @@ document.addEventListener('DOMContentLoaded', () => {
         if (template) {
             const content = template.content.cloneNode(true);
             container.appendChild(content);
-            
+
             // Show/hide elements based on authentication
             updateAuthUI();
         }
     }
+    // Edit an item
+function editItem(itemId) {
+    // For now, simply navigate to sell page
+    // In a more advanced implementation, you could pre-fill a form with the item's current data
+    navigateTo('sell');
+    
+    // Show a message to the user
+    showAlert('To edit your item, please create a new listing and delete the old one', 'info');
+}
 
     // Update UI elements based on authentication state
     function updateAuthUI() {
         const isLoggedIn = !!state.user;
-        
+
         // Update navigation
         document.getElementById('login-link').classList.toggle('hidden', isLoggedIn);
         document.getElementById('register-link').classList.toggle('hidden', isLoggedIn);
@@ -362,14 +375,14 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('logout-link').classList.toggle('hidden', !isLoggedIn);
         document.getElementById('sell-link').classList.toggle('hidden', !isLoggedIn);
         document.getElementById('alerts-link').classList.toggle('hidden', !isLoggedIn);
-        
+
         // Update alert badge
         const alertBadge = document.getElementById('alert-badge');
         if (alertBadge) {
             alertBadge.classList.toggle('hidden', state.alertCount === 0);
             alertBadge.textContent = state.alertCount;
         }
-        
+
         // Update auth-required elements
         document.querySelectorAll('.auth-required').forEach(element => {
             element.classList.toggle('hidden', !isLoggedIn);
@@ -382,16 +395,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const headers = {
             'Content-Type': 'application/json'
         };
-        
+
         if (state.token) {
             headers['Authorization'] = `Bearer ${state.token}`;
         }
-        
+
         const options = {
             method,
             headers
         };
-        
+
         if (data) {
             if (data instanceof FormData) {
                 // If FormData, don't set Content-Type header
@@ -401,25 +414,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 options.body = JSON.stringify(data);
             }
         }
-        
+
         try {
             const response = await fetch(`${API_URL}${endpoint}`, options);
-            
+
             // Check if response is JSON
             const contentType = response.headers.get('content-type');
             if (contentType && contentType.includes('application/json')) {
                 const responseData = await response.json();
-                
+
                 if (!response.ok) {
                     throw new Error(responseData.message || 'API request failed');
                 }
-                
+
                 return responseData;
             } else {
                 if (!response.ok) {
                     throw new Error('API request failed');
                 }
-                
+
                 return await response.text();
             }
         } catch (error) {
@@ -434,20 +447,20 @@ document.addEventListener('DOMContentLoaded', () => {
     async function login() {
         const email = document.getElementById('login-email').value;
         const password = document.getElementById('login-password').value;
-        
+
         try {
             const data = await apiRequest('/users/login', 'POST', { email, password });
-            
+
             // Save token and user data
             localStorage.setItem('token', data.token);
             state.token = data.token;
             state.user = data.user;
-            
+
             // Update UI and redirect
             updateAuthUI();
             showAlert('Login successful!', 'success');
             navigateTo('home');
-            
+
             // Check for alerts
             checkForAlerts();
         } catch (error) {
@@ -462,12 +475,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const fullName = document.getElementById('register-full-name').value;
         const password = document.getElementById('register-password').value;
         const confirmPassword = document.getElementById('register-confirm-password').value;
-        
+
         if (password !== confirmPassword) {
             showAlert('Passwords do not match', 'danger');
             return;
         }
-        
+
         try {
             const data = await apiRequest('/users', 'POST', {
                 username,
@@ -475,12 +488,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 password,
                 full_name: fullName
             });
-            
+
             // Save token and user data
             localStorage.setItem('token', data.token);
             state.token = data.token;
             state.user = data.user;
-            
+
             // Update UI and redirect
             updateAuthUI();
             showAlert('Registration successful!', 'success');
@@ -496,7 +509,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.removeItem('token');
         state.token = null;
         state.user = null;
-        
+
         // Update UI and redirect
         updateAuthUI();
         showAlert('You have been logged out', 'info');
@@ -511,11 +524,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Check for unread alerts
     async function checkForAlerts() {
         if (!state.user) return;
-        
+
         try {
             const alerts = await apiRequest('/alerts');
             const unreadCount = alerts.filter(alert => !alert.is_read).length;
-            
+
             state.alertCount = unreadCount;
             updateAuthUI();
         } catch (error) {
@@ -528,19 +541,19 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadFeaturedItems() {
         const container = document.getElementById('featured-items-container');
         if (!container) return;
-        
+
         container.innerHTML = '<div class="loading">Loading...</div>';
-        
+
         try {
             const items = await apiRequest('/items?limit=4');
-            
+
             if (items.length === 0) {
                 container.innerHTML = '<p class="no-items">No items available</p>';
                 return;
             }
-            
+
             container.innerHTML = '';
-            
+
             items.forEach(item => {
                 const itemElement = createItemCard(item);
                 container.appendChild(itemElement);
@@ -555,34 +568,34 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadCategories() {
         const container = document.getElementById('categories-container');
         const categoryFilter = document.getElementById('category-filter');
-        
+
         try {
             const categories = await apiRequest('/categories');
-            
+
             // Update category grid if it exists
             if (container) {
                 container.innerHTML = '';
-                
+
                 categories.forEach(category => {
                     const categoryElement = createCategoryCard(category);
                     container.appendChild(categoryElement);
                 });
             }
-            
+
             // Update category filter if it exists
             if (categoryFilter) {
                 // Keep the first option
                 const firstOption = categoryFilter.options[0];
                 categoryFilter.innerHTML = '';
                 categoryFilter.appendChild(firstOption);
-                
+
                 categories.forEach(category => {
                     const option = document.createElement('option');
                     option.value = category.category_id;
                     option.textContent = category.name;
                     categoryFilter.appendChild(option);
                 });
-                
+
                 // Set selected category if specified in params
                 if (state.params && state.params.categoryId) {
                     categoryFilter.value = state.params.categoryId;
@@ -602,7 +615,7 @@ document.addEventListener('DOMContentLoaded', () => {
         card.className = 'category-card';
         card.dataset.id = category.category_id;
         card.dataset.action = 'browseCategory';
-        
+
         // Get icon based on category name
         let icon = 'fa-tag';
         switch (category.name.toLowerCase()) {
@@ -622,14 +635,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 icon = 'fa-file-alt';
                 break;
         }
-        
+
         card.innerHTML = `
             <div class="category-icon">
                 <i class="fas ${icon}"></i>
             </div>
             <div class="category-name">${category.name}</div>
         `;
-        
+
         return card;
     }
 
@@ -638,28 +651,28 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadItems(params = {}) {
         const container = document.getElementById('browse-items-container');
         if (!container) return;
-        
+
         container.innerHTML = '<div class="loading">Loading...</div>';
-        
+
         // Build query string
         const queryParams = [];
         if (params.search) queryParams.push(`search=${encodeURIComponent(params.search)}`);
         if (params.category) queryParams.push(`category=${encodeURIComponent(params.category)}`);
         if (params.categoryId) queryParams.push(`category=${encodeURIComponent(params.categoryId)}`);
         if (params.seller) queryParams.push(`seller=${encodeURIComponent(params.seller)}`);
-        
+
         const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
-        
+
         try {
             const items = await apiRequest(`/items${queryString}`);
-            
+
             if (items.length === 0) {
                 container.innerHTML = '<p class="no-items">No items found</p>';
                 return;
             }
-            
+
             container.innerHTML = '';
-            
+
             items.forEach(item => {
                 const itemElement = createItemCard(item);
                 container.appendChild(itemElement);
@@ -675,11 +688,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const card = document.createElement('div');
         card.className = 'item-card';
         card.dataset.id = item.item_id;
-        card.dataset.action = 'viewItem';
-        
+
+        // Make entire card clickable
+        card.addEventListener('click', () => {
+            console.log('Item card clicked, ID:', item.item_id);
+            viewItem(item.item_id);
+        });
+
         // Default thumbnail if none provided
         const thumbnail = item.thumbnail_path || '/img/default-thumbnail.png';
-        
+
         card.innerHTML = `
             <div class="item-image">
                 <img src="${thumbnail}" alt="${item.title}">
@@ -690,40 +708,47 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="item-seller">by ${item.seller_name || 'Unknown'}</div>
             </div>
         `;
-        
+
         return card;
     }
 
     // View an item
     function viewItem(itemId) {
+        console.log('Navigating to item with ID:', itemId);
         navigateTo('item', { itemId });
     }
 
     // Item Detail Page Functions
     // Load item details
     async function loadItem(itemId) {
-        if (!itemId) return;
-        
+        if (!itemId) {
+            console.error('No itemId provided to loadItem function');
+            return;
+        }
+
+        console.log('Loading item data for ID:', itemId);
         state.currentItemId = itemId;
-        
+
         try {
+            console.log('Making API request to /items/' + itemId);
             const item = await apiRequest(`/items/${itemId}`);
-            
+            console.log('Received item data:', item);
+
             // Update item details
             document.getElementById('item-title').textContent = item.title;
             document.getElementById('item-description').textContent = item.description;
             document.getElementById('item-category').textContent = item.category_name;
             document.getElementById('item-seller').textContent = item.seller_name;
             document.getElementById('item-price').textContent = `$${parseFloat(item.price).toFixed(2)}`;
-            
+
             // Set thumbnail
             const thumbnailImg = document.getElementById('item-thumbnail');
             thumbnailImg.src = item.thumbnail_path || '/img/default-thumbnail.png';
             thumbnailImg.alt = item.title;
-            
+
             // Load reviews
             loadReviews(item.reviews);
-            
+
             // Update purchase button
             const purchaseButton = document.getElementById('purchase-button');
             if (state.user && state.user.user_id === item.seller_id) {
@@ -734,7 +759,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 purchaseButton.dataset.action = 'purchaseItem';
             }
         } catch (error) {
-            showAlert('Failed to load item details', 'danger');
+            showAlert('Failed to load item details: ' + error.message, 'danger');
             console.error('Failed to load item:', error);
         }
     }
@@ -743,14 +768,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function loadReviews(reviews) {
         const container = document.getElementById('reviews-container');
         if (!container) return;
-        
+
         if (!reviews || reviews.length === 0) {
             container.innerHTML = '<p class="no-reviews">No reviews yet</p>';
             return;
         }
-        
+
         container.innerHTML = '';
-        
+
         reviews.forEach(review => {
             const reviewElement = createReviewElement(review);
             container.appendChild(reviewElement);
@@ -761,9 +786,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function createReviewElement(review) {
         const reviewElement = document.createElement('div');
         reviewElement.className = 'review';
-        
+
         const date = new Date(review.created_at).toLocaleDateString();
-        
+
         reviewElement.innerHTML = `
             <div class="review-header">
                 <span class="reviewer">${review.reviewer_name}</span>
@@ -774,7 +799,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <div class="review-comment">${review.comment}</div>
         `;
-        
+
         return reviewElement;
     }
 
@@ -793,39 +818,49 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Update star rating display
     function updateStarRating(rating) {
+        // Convert rating to number
+        rating = parseInt(rating);
+        // Find all star icons
         const stars = document.querySelectorAll('.star-rating i');
+
         stars.forEach(star => {
             const starRating = parseInt(star.dataset.rating);
+            // Add active class to stars with rating <= selected rating
             if (starRating <= rating) {
-                star.classList.add('active');
+                star.classList.remove('far');
+                star.classList.add('fas', 'active');
             } else {
-                star.classList.remove('active');
+                star.classList.remove('fas', 'active');
+                star.classList.add('far');
             }
         });
+
+        // Set the hidden input value
+        document.getElementById('rating-input').value = rating;
     }
 
     // Submit a review
     async function submitReview(itemId) {
         const rating = document.getElementById('rating-input').value;
         const comment = document.getElementById('review-comment').value;
-        
+
         if (!rating) {
             showAlert('Please select a rating', 'warning');
             return;
         }
-        
+
         try {
             await apiRequest(`/reviews`, 'POST', {
                 item_id: itemId,
                 rating,
                 comment
             });
-            
+
             showAlert('Review submitted successfully!', 'success');
-            
+
             // Reload item to show new review
             loadItem(itemId);
-            
+
             // Clear form
             document.getElementById('review-comment').value = '';
             updateStarRating(5);
@@ -839,9 +874,9 @@ document.addEventListener('DOMContentLoaded', () => {
     async function purchaseItem(itemId) {
         try {
             await apiRequest('/purchases', 'POST', { item_id: itemId });
-            
+
             showAlert('Item purchased successfully!', 'success');
-            
+
             // Navigate to profile/purchases
             navigateTo('profile');
             switchTab('purchases');
@@ -855,17 +890,17 @@ document.addEventListener('DOMContentLoaded', () => {
     function openSetAlertModal(itemId) {
         // Navigate to alerts page and open modal
         navigateTo('alerts');
-        
+
         // Wait for page to load and then open modal
         setTimeout(() => {
             openNewAlertModal();
-            
+
             // Pre-select item
             const alertItemInput = document.getElementById('alert-item-input');
             if (alertItemInput) {
                 alertItemInput.value = itemId;
             }
-            
+
             // Show price threshold field
             document.getElementById('alert-price-group').classList.remove('hidden');
         }, 500);
@@ -875,15 +910,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load user profile
     async function loadProfile() {
         if (!state.user) return;
-        
+
         try {
             const profile = await fetchUserProfile();
-            
+
             // Update profile form
             document.getElementById('profile-username').value = profile.username;
             document.getElementById('profile-email').value = profile.email;
             document.getElementById('profile-full-name').value = profile.full_name;
-            
+
             // Update profile image
             const profileImage = document.getElementById('profile-image');
             profileImage.src = profile.profile_image || '/img/default-profile.png';
@@ -899,29 +934,29 @@ document.addEventListener('DOMContentLoaded', () => {
         const email = document.getElementById('profile-email').value;
         const fullName = document.getElementById('profile-full-name').value;
         const password = document.getElementById('profile-password').value;
-        
+
         const data = {
             username,
             email,
             full_name: fullName
         };
-        
+
         if (password) {
             data.password = password;
         }
-        
+
         try {
             const updatedProfile = await apiRequest('/users/profile', 'PUT', data);
-            
+
             state.user = {
                 ...state.user,
                 username: updatedProfile.username,
                 email: updatedProfile.email,
                 full_name: updatedProfile.full_name
             };
-            
+
             showAlert('Profile updated successfully!', 'success');
-            
+
             // Clear password field
             document.getElementById('profile-password').value = '';
         } catch (error) {
@@ -934,19 +969,19 @@ document.addEventListener('DOMContentLoaded', () => {
     async function uploadProfileImage() {
         const fileInput = document.getElementById('profile-image-upload');
         const file = fileInput.files[0];
-        
+
         if (!file) return;
-        
+
         const formData = new FormData();
         formData.append('profile_image', file);
-        
+
         try {
             const updatedProfile = await apiRequest('/users/profile', 'PUT', formData);
-            
+
             // Update profile image
             const profileImage = document.getElementById('profile-image');
             profileImage.src = updatedProfile.profile_image;
-            
+
             showAlert('Profile image updated successfully!', 'success');
         } catch (error) {
             showAlert('Failed to update profile image', 'danger');
@@ -960,7 +995,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.tab-item').forEach(item => {
             item.classList.toggle('active', item.dataset.tab === tab);
         });
-        
+
         // Update tab content
         document.querySelectorAll('.tab-pane').forEach(pane => {
             pane.classList.toggle('active', pane.id === `${tab}-tab`);
@@ -971,19 +1006,19 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadPurchases() {
         const container = document.getElementById('purchases-container');
         if (!container) return;
-        
+
         container.innerHTML = '<div class="loading">Loading...</div>';
-        
+
         try {
             const purchases = await apiRequest('/purchases');
-            
+
             if (purchases.length === 0) {
                 container.innerHTML = '<p class="no-items">No purchases yet</p>';
                 return;
             }
-            
+
             container.innerHTML = '';
-            
+
             purchases.forEach(purchase => {
                 const purchaseElement = createPurchaseElement(purchase);
                 container.appendChild(purchaseElement);
@@ -998,9 +1033,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function createPurchaseElement(purchase) {
         const element = document.createElement('div');
         element.className = 'purchase-card';
-        
+
         const date = new Date(purchase.purchase_date).toLocaleDateString();
-        
+
         element.innerHTML = `
             <div class="purchase-image">
                 <img src="${purchase.thumbnail_path || '/img/default-thumbnail.png'}" alt="${purchase.title}">
@@ -1016,7 +1051,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </button>
             </div>
         `;
-        
+
         return element;
     }
 
@@ -1024,19 +1059,19 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadSales() {
         const container = document.getElementById('sales-container');
         if (!container) return;
-        
+
         container.innerHTML = '<div class="loading">Loading...</div>';
-        
+
         try {
             const sales = await apiRequest('/items?seller=' + state.user.user_id);
-            
+
             if (sales.length === 0) {
                 container.innerHTML = '<p class="no-items">No sales yet</p>';
                 return;
             }
-            
+
             container.innerHTML = '';
-            
+
             sales.forEach(sale => {
                 const saleElement = createSaleElement(sale);
                 container.appendChild(saleElement);
@@ -1051,7 +1086,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function createSaleElement(sale) {
         const element = document.createElement('div');
         element.className = 'sale-card';
-        
+
         element.innerHTML = `
             <div class="sale-image">
                 <img src="${sale.thumbnail_path || '/img/default-thumbnail.png'}" alt="${sale.title}">
@@ -1067,7 +1102,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </button>
             </div>
         `;
-        
+
         return element;
     }
 
@@ -1076,15 +1111,15 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadCategoriesForSell() {
         const categoryInput = document.getElementById('item-category-input');
         if (!categoryInput) return;
-        
+
         try {
             const categories = await apiRequest('/categories');
-            
+
             // Keep the first option
             const firstOption = categoryInput.options[0];
             categoryInput.innerHTML = '';
             categoryInput.appendChild(firstOption);
-            
+
             categories.forEach(category => {
                 const option = document.createElement('option');
                 option.value = category.category_id;
@@ -1104,32 +1139,37 @@ document.addEventListener('DOMContentLoaded', () => {
         const categoryId = document.getElementById('item-category-input').value;
         const fileInput = document.getElementById('item-file-input');
         const thumbnailInput = document.getElementById('item-thumbnail-input');
-        
-        if (!title || !price || !categoryId || !fileInput.files[0]) {
+
+        if (!title || !price || !categoryId) {
             showAlert('Please fill in all required fields', 'warning');
             return;
         }
-        
+
         const formData = new FormData();
         formData.append('title', title);
         formData.append('description', description);
         formData.append('price', price);
         formData.append('category_id', categoryId);
-        formData.append('file', fileInput.files[0]);
-        
+
+        // Only append file if one is selected
+        if (fileInput.files[0]) {
+            formData.append('file', fileInput.files[0]);
+        }
+
+        // Only append thumbnail if one is selected
         if (thumbnailInput.files[0]) {
             formData.append('thumbnail', thumbnailInput.files[0]);
         }
-        
+
         try {
             const item = await apiRequest('/items', 'POST', formData);
-            
+
             showAlert('Item listed successfully!', 'success');
-            
+
             // Navigate to item page
             navigateTo('item', { itemId: item.item_id });
         } catch (error) {
-            showAlert('Failed to list item', 'danger');
+            showAlert('Failed to list item: ' + (error.message || 'Unknown error'), 'danger');
             console.error('Failed to list item:', error);
         }
     }
@@ -1139,24 +1179,24 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadAlerts() {
         const container = document.getElementById('alerts-container');
         if (!container) return;
-        
+
         container.innerHTML = '<div class="loading">Loading...</div>';
-        
+
         try {
             const alerts = await apiRequest('/alerts');
-            
+
             if (alerts.length === 0) {
                 container.innerHTML = '<p class="no-alerts">No alerts set</p>';
                 return;
             }
-            
+
             container.innerHTML = '';
-            
+
             alerts.forEach(alert => {
                 const alertElement = createAlertElement(alert);
                 container.appendChild(alertElement);
             });
-            
+
             // Update alert count
             state.alertCount = alerts.filter(alert => !alert.is_read).length;
             updateAuthUI();
@@ -1174,10 +1214,10 @@ document.addEventListener('DOMContentLoaded', () => {
             element.classList.add('unread');
         }
         element.dataset.id = alert.alert_id;
-        
+
         let alertTitle = '';
         let alertInfo = '';
-        
+
         switch (alert.alert_type_name) {
             case 'Price Drop':
                 alertTitle = 'Price Drop Alert';
@@ -1199,7 +1239,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 alertTitle = 'Alert';
                 alertInfo = 'You have a new alert';
         }
-        
+
         element.innerHTML = `
             <div class="alert-content">
                 <div class="alert-title">${alertTitle}</div>
@@ -1211,17 +1251,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 <button class="btn btn-danger" data-action="deleteAlert"><i class="fas fa-trash"></i></button>
             </div>
         `;
-        
+
         return element;
     }
 
     // Mark alert as read
     async function markAlertAsRead(alertId) {
         if (!alertId) return;
-        
+
         try {
             await apiRequest(`/alerts/${alertId}/read`, 'PUT');
-            
+
             // Reload alerts
             loadAlerts();
         } catch (error) {
@@ -1233,10 +1273,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Delete alert
     async function deleteAlert(alertId) {
         if (!alertId) return;
-        
+
         try {
             await apiRequest(`/alerts/${alertId}`, 'DELETE');
-            
+
             // Reload alerts
             loadAlerts();
         } catch (error) {
@@ -1261,14 +1301,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateAlertForm() {
         const alertType = document.getElementById('alert-type-input').value;
         const alertTypeText = document.getElementById('alert-type-input').options[document.getElementById('alert-type-input').selectedIndex].text;
-        
+
         // Show/hide fields based on alert type
         document.getElementById('alert-item-group').classList.add('hidden');
         document.getElementById('alert-category-group').classList.add('hidden');
         document.getElementById('alert-price-group').classList.add('hidden');
-        
+
         if (!alertType) return;
-        
+
         switch (alertTypeText) {
             case 'Price Drop':
                 document.getElementById('alert-item-group').classList.remove('hidden');
@@ -1290,15 +1330,15 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadAlertTypes() {
         const alertTypeInput = document.getElementById('alert-type-input');
         if (!alertTypeInput) return;
-        
+
         try {
             const alertTypes = await apiRequest('/alerts/types');
-            
+
             // Keep the first option
             const firstOption = alertTypeInput.options[0];
             alertTypeInput.innerHTML = '';
             alertTypeInput.appendChild(firstOption);
-            
+
             alertTypes.forEach(type => {
                 const option = document.createElement('option');
                 option.value = type.alert_type_id;
@@ -1314,15 +1354,15 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadCategoriesForAlerts() {
         const categoryInput = document.getElementById('alert-category-input');
         if (!categoryInput) return;
-        
+
         try {
             const categories = await apiRequest('/categories');
-            
+
             // Keep the first option
             const firstOption = categoryInput.options[0];
             categoryInput.innerHTML = '';
             categoryInput.appendChild(firstOption);
-            
+
             categories.forEach(category => {
                 const option = document.createElement('option');
                 option.value = category.category_id;
@@ -1338,22 +1378,22 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadItemsForAlerts() {
         const itemInput = document.getElementById('alert-item-input');
         if (!itemInput) return;
-        
+
         try {
             const items = await apiRequest('/items');
-            
+
             // Keep the first option
             const firstOption = itemInput.options[0];
             itemInput.innerHTML = '';
             itemInput.appendChild(firstOption);
-            
+
             items.forEach(item => {
                 const option = document.createElement('option');
                 option.value = item.item_id;
                 option.textContent = item.title;
                 itemInput.appendChild(option);
             });
-            
+
             // If current item is set, select it
             if (state.currentItemId) {
                 itemInput.value = state.currentItemId;
@@ -1369,15 +1409,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const itemId = document.getElementById('alert-item-input').value;
         const categoryId = document.getElementById('alert-category-input').value;
         const priceThreshold = document.getElementById('alert-price-input').value;
-        
+
         if (!alertTypeId) {
             showAlert('Please select an alert type', 'warning');
             return;
         }
-        
+
         // Check required fields based on alert type
         const alertTypeText = document.getElementById('alert-type-input').options[document.getElementById('alert-type-input').selectedIndex].text;
-        
+
         switch (alertTypeText) {
             case 'Price Drop':
                 if (!itemId) {
@@ -1399,7 +1439,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 break;
         }
-        
+
         try {
             await apiRequest('/alerts', 'POST', {
                 alert_type_id: alertTypeId,
@@ -1407,9 +1447,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 category_id: categoryId || null,
                 price_threshold: priceThreshold || null
             });
-            
+
             showAlert('Alert created successfully!', 'success');
-            
+
             // Close modal and reload alerts
             closeModal();
             loadAlerts();
@@ -1423,16 +1463,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // Show alert message
     function showAlert(message, type = 'info') {
         const alertContainer = document.getElementById('alert-container');
-        
+
         const alert = document.createElement('div');
         alert.className = `alert alert-${type}`;
         alert.innerHTML = `
             <span>${message}</span>
             <span class="close" data-action="closeAlert">&times;</span>
         `;
-        
+
         alertContainer.appendChild(alert);
-        
+
         // Auto remove after 5 seconds
         setTimeout(() => {
             closeAlert(alert);
