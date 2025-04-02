@@ -15,7 +15,7 @@ const createItem = async (req, res) => {
     }
 
     // Initialize file path variables
-    let filePath = '';  // Default to empty string instead of null
+    let filePath = ''; // Default to empty string instead of null
     let thumbnailPath = null;
     
     // Handle file upload if provided

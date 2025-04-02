@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const path = require('path');
+const fs = require('fs');
 
 // @desc    Create a new purchase
 // @route   POST /api/purchases
@@ -122,8 +123,22 @@ const downloadPurchasedItem = async (req, res) => {
     
     const purchase = purchases[0];
     
+    // Check if file exists
+    if (!purchase.file_path) {
+      return res.status(404).json({ message: 'File not found' });
+    }
+    
+    const filePath = path.join(__dirname, '..', 'public', purchase.file_path);
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: 'File not found on server' });
+    }
+    
+    // Generate a suitable filename
+    const fileName = purchase.title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + path.extname(purchase.file_path);
+    
     // Send file
-    res.download(`./public${purchase.file_path}`, `${purchase.title}${path.extname(purchase.file_path)}`);
+    res.download(filePath, fileName);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error' });

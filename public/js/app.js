@@ -97,6 +97,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     const alertToDeleteId = e.target.closest('.alert-card').dataset.id;
                     deleteAlert(alertToDeleteId);
                     break;
+                case 'deleteItem':
+                    const itemToDeleteId = e.target.dataset.id;
+                    const itemTitle = e.target.closest('.sale-card')?.querySelector('.sale-title')?.textContent || 'this item';
+                    confirmDeleteItem(itemToDeleteId, itemTitle);
+                    break;
+                case 'downloadItem':
+                    const downloadItemId = e.target.dataset.id;
+                    downloadPurchasedItem(downloadItemId);
+                    break;
             }
         }
     }
@@ -354,15 +363,72 @@ document.addEventListener('DOMContentLoaded', () => {
             updateAuthUI();
         }
     }
+
     // Edit an item
-function editItem(itemId) {
-    // For now, simply navigate to sell page
-    // In a more advanced implementation, you could pre-fill a form with the item's current data
-    navigateTo('sell');
-    
-    // Show a message to the user
-    showAlert('To edit your item, please create a new listing and delete the old one', 'info');
-}
+    function editItem(itemId) {
+        // For now, simply navigate to sell page
+        // In a more advanced implementation, you could pre-fill a form with the item's current data
+        navigateTo('sell');
+        
+        // Show a message to the user
+        showAlert('To edit your item, please create a new listing and delete the old one', 'info');
+    }
+
+    // Confirm delete item dialog
+    function confirmDeleteItem(itemId, title) {
+        if (confirm(`Are you sure you want to delete "${title}"? This cannot be undone.`)) {
+            deleteItem(itemId);
+        }
+    }
+
+    // Delete an item
+    async function deleteItem(itemId) {
+        try {
+            await apiRequest(`/items/${itemId}`, 'DELETE');
+            
+            showAlert('Item deleted successfully!', 'success');
+            
+            // If on item detail page, navigate back to profile
+            if (state.currentPage === 'item') {
+                navigateTo('profile');
+                switchTab('sales');
+            } else {
+                // If on profile page, just reload sales
+                loadSales();
+            }
+        } catch (error) {
+            showAlert('Failed to delete item: ' + error.message, 'danger');
+            console.error('Failed to delete item:', error);
+        }
+    }
+
+    // Download a purchased item
+    async function downloadPurchasedItem(itemId) {
+        try {
+            // Get the purchase ID
+            const purchases = await apiRequest('/purchases');
+            const purchase = purchases.find(p => p.item_id === parseInt(itemId));
+            
+            if (!purchase) {
+                showAlert('Item not found in your purchases', 'danger');
+                return;
+            }
+            
+            // Create temporary anchor to initiate download
+            const a = document.createElement('a');
+            a.href = `/api/purchases/${purchase.purchase_id}/download`;
+            a.download = '';
+            a.target = '_blank';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            showAlert('Download started!', 'success');
+        } catch (error) {
+            showAlert('Failed to download item: ' + error.message, 'danger');
+            console.error('Failed to download item:', error);
+        }
+    }
 
     // Update UI elements based on authentication state
     function updateAuthUI() {
@@ -751,10 +817,23 @@ function editItem(itemId) {
 
             // Update purchase button
             const purchaseButton = document.getElementById('purchase-button');
+            const itemActions = document.querySelector('.item-actions');
+
             if (state.user && state.user.user_id === item.seller_id) {
+                // Item owner view - show edit and delete buttons
                 purchaseButton.textContent = 'Edit Item';
                 purchaseButton.dataset.action = 'editItem';
+                
+                // Create delete button
+                const deleteButton = document.createElement('button');
+                deleteButton.className = 'btn btn-danger';
+                deleteButton.textContent = 'Delete Item';
+                deleteButton.addEventListener('click', () => confirmDeleteItem(item.item_id, item.title));
+                
+                // Add to actions container
+                itemActions.appendChild(deleteButton);
             } else {
+                // Non-owner view - show purchase button
                 purchaseButton.textContent = 'Purchase';
                 purchaseButton.dataset.action = 'purchaseItem';
             }
@@ -872,6 +951,11 @@ function editItem(itemId) {
 
     // Purchase an item
     async function purchaseItem(itemId) {
+        // Confirm the purchase
+        if (!confirm('Are you sure you want to purchase this item?')) {
+            return;
+        }
+        
         try {
             await apiRequest('/purchases', 'POST', { item_id: itemId });
 
@@ -881,7 +965,7 @@ function editItem(itemId) {
             navigateTo('profile');
             switchTab('purchases');
         } catch (error) {
-            showAlert('Failed to purchase item', 'danger');
+            showAlert('Failed to purchase item: ' + error.message, 'danger');
             console.error('Failed to purchase item:', error);
         }
     }
@@ -1052,6 +1136,13 @@ function editItem(itemId) {
             </div>
         `;
 
+        // Add download click handler
+        const downloadBtn = element.querySelector('[data-action="downloadItem"]');
+        downloadBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            downloadPurchasedItem(purchase.item_id);
+        });
+
         return element;
     }
 
@@ -1100,8 +1191,24 @@ function editItem(itemId) {
                 <button class="btn btn-secondary" data-action="editItem" data-id="${sale.item_id}">
                     <i class="fas fa-edit"></i> Edit
                 </button>
+                <button class="btn btn-danger" data-action="deleteItem" data-id="${sale.item_id}">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
             </div>
         `;
+
+        // Add event listeners
+        const deleteBtn = element.querySelector('[data-action="deleteItem"]');
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent card click
+            confirmDeleteItem(sale.item_id, sale.title);
+        });
+
+        const editBtn = element.querySelector('[data-action="editItem"]');
+        editBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent card click
+            editItem(sale.item_id);
+        });
 
         return element;
     }
@@ -1133,15 +1240,26 @@ function editItem(itemId) {
 
     // Sell an item
     async function sellItem() {
-        const title = document.getElementById('item-title-input').value;
-        const description = document.getElementById('item-description-input').value;
+        const title = document.getElementById('item-title-input').value.trim();
+        const description = document.getElementById('item-description-input').value.trim();
         const price = document.getElementById('item-price-input').value;
         const categoryId = document.getElementById('item-category-input').value;
         const fileInput = document.getElementById('item-file-input');
         const thumbnailInput = document.getElementById('item-thumbnail-input');
-
-        if (!title || !price || !categoryId) {
-            showAlert('Please fill in all required fields', 'warning');
+        
+        // Validation
+        if (!title) {
+            showAlert('Please enter a title', 'warning');
+            return;
+        }
+        
+        if (!price || parseFloat(price) <= 0) {
+            showAlert('Please enter a valid price greater than 0', 'warning');
+            return;
+        }
+        
+        if (!categoryId) {
+            showAlert('Please select a category', 'warning');
             return;
         }
 
