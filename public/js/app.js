@@ -9,6 +9,33 @@ document.addEventListener('DOMContentLoaded', () => {
         alertCount: 0
     };
 
+    //Sanitation Helpers
+
+      // Simple HTML‐escaping to neutralize any tags
+  function sanitizeInput(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // Display an inline error message right after a field
+  function showFieldError(el, message) {
+    // remove existing
+    const existing = el.nextElementSibling;
+    if (existing?.classList.contains('field-error')) existing.remove();
+
+    const err = document.createElement('div');
+    err.className = 'field-error';
+    err.textContent = message;
+    el.after(err);
+  }
+
+  // Clear all inline errors in a form (call at start of each submit)
+  function clearFieldErrors(formEl) {
+    formEl.querySelectorAll('.field-error').forEach(e => e.remove());
+  }
+
+
     // API Base URL
     const API_URL = '/api';
 
@@ -301,9 +328,54 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadCategoriesForSell();
 
                 const sellForm = document.getElementById('sell-form');
-                sellForm.addEventListener('submit', (e) => {
-                    e.preventDefault();
-                    sellItem();
+                sellForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                clearFieldErrors(sellForm);
+
+                const titleEl    = document.getElementById('item-title-input');
+                const descEl     = document.getElementById('item-description-input');
+                const priceEl    = document.getElementById('item-price-input');
+                const categoryEl = document.getElementById('item-category-input');
+                const fileInput  = document.getElementById('item-file-input');
+                const thumbInput = document.getElementById('item-thumbnail-input');
+
+                let hasError = false;
+                const title       = titleEl.value.trim();
+                const description = descEl.value.trim();
+                const price       = parseFloat(priceEl.value);
+                const categoryId  = categoryEl.value;
+
+                if (!title)       { showFieldError(titleEl, 'Title is required'); hasError = true; }
+                if (!description) { showFieldError(descEl, 'Description is required'); hasError = true; }
+                if (isNaN(price) || price <= 0) {
+                    showFieldError(priceEl, 'Enter a valid price (> 0)'); hasError = true;
+                }
+                if (!categoryId)  { showFieldError(categoryEl, 'Please select a category'); hasError = true; }
+
+                if (hasError) return;
+
+                // sanitize
+                const safeTitle       = sanitizeInput(title);
+                const safeDescription = sanitizeInput(description);
+
+                const formData = new FormData();
+                formData.append('title', safeTitle);
+                formData.append('description', safeDescription);
+                formData.append('price', price);
+                formData.append('category_id', categoryId);
+                if (fileInput.files[0])  formData.append('file', fileInput.files[0]);
+                if (thumbInput.files[0]) formData.append('thumbnail', thumbInput.files[0]);
+
+                try {
+                    const item = await apiRequest('/items', 'POST', formData);
+                    showAlert('Item listed successfully!', 'success');
+                    navigateTo('item', { itemId: item.item_id });
+                } catch (err) {
+                    showAlert('Failed to list item: ' + err.message, 'danger');
+                }
+                
+
+                
                 });
                 break;
 
