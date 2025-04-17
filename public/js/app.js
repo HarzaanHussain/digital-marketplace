@@ -9,31 +9,26 @@ document.addEventListener('DOMContentLoaded', () => {
         alertCount: 0
     };
 
-    //Sanitation Helpers
+    
 
-      // Simple HTML‐escaping to neutralize any tags
-  function sanitizeInput(str) {
+   /* ---------- Sanitation helper utilities ---------- */
+const sanitize = str => {
     const div = document.createElement('div');
     div.textContent = str;
-    return div.innerHTML;
-  }
-
-  // Display an inline error message right after a field
-  function showFieldError(el, message) {
-    // remove existing
-    const existing = el.nextElementSibling;
-    if (existing?.classList.contains('field-error')) existing.remove();
-
-    const err = document.createElement('div');
-    err.className = 'field-error';
-    err.textContent = message;
-    el.after(err);
-  }
-
-  // Clear all inline errors in a form (call at start of each submit)
-  function clearFieldErrors(formEl) {
-    formEl.querySelectorAll('.field-error').forEach(e => e.remove());
-  }
+    return div.innerHTML;           // encoded version
+  };
+  
+  const showFieldError = (el, msg) => {
+    const old = el.nextElementSibling;
+    if (old?.classList.contains('field-error')) old.remove();
+  
+    const e = document.createElement('div');
+    e.className = 'field-error';
+    e.textContent = msg;
+    el.after(e);
+  };
+  /* ------------------------------------------- */
+  
 
 
     // API Base URL
@@ -1310,60 +1305,72 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    
     // Sell an item
-    async function sellItem() {
-        const title = document.getElementById('item-title-input').value.trim();
-        const description = document.getElementById('item-description-input').value.trim();
-        const price = document.getElementById('item-price-input').value;
-        const categoryId = document.getElementById('item-category-input').value;
-        const fileInput = document.getElementById('item-file-input');
-        const thumbnailInput = document.getElementById('item-thumbnail-input');
-        
-        // Validation
-        if (!title) {
-            showAlert('Please enter a title', 'warning');
-            return;
-        }
-        
-        if (!price || parseFloat(price) <= 0) {
-            showAlert('Please enter a valid price greater than 0', 'warning');
-            return;
-        }
-        
-        if (!categoryId) {
-            showAlert('Please select a category', 'warning');
-            return;
-        }
+async function sellItem () {
 
-        const formData = new FormData();
-        formData.append('title', title);
-        formData.append('description', description);
-        formData.append('price', price);
-        formData.append('category_id', categoryId);
-
-        // Only append file if one is selected
-        if (fileInput.files[0]) {
-            formData.append('file', fileInput.files[0]);
-        }
-
-        // Only append thumbnail if one is selected
-        if (thumbnailInput.files[0]) {
-            formData.append('thumbnail', thumbnailInput.files[0]);
-        }
-
-        try {
-            const item = await apiRequest('/items', 'POST', formData);
-
-            showAlert('Item listed successfully!', 'success');
-
-            // Navigate to item page
-            navigateTo('item', { itemId: item.item_id });
-        } catch (error) {
-            showAlert('Failed to list item: ' + (error.message || 'Unknown error'), 'danger');
-            console.error('Failed to list item:', error);
-        }
+    const form = document.getElementById('sell-form');
+    clearFieldErrors(form);                    // remove old inline errors
+  
+    // grab elements only once
+    const titleEl    = document.getElementById('item-title-input');
+    const descEl     = document.getElementById('item-description-input');
+    const priceEl    = document.getElementById('item-price-input');
+    const catEl      = document.getElementById('item-category-input');
+    const fileInput  = document.getElementById('item-file-input');
+    const thumbInput = document.getElementById('item-thumbnail-input');
+  
+    // values
+    const title       = titleEl.value.trim();
+    const description = descEl.value.trim();
+    const price       = parseFloat(priceEl.value);
+    const categoryId  = catEl.value;
+  
+    /* ---------- validation ---------- */
+    let hasError = false;
+    const titleOk = /^[\w\s\-&'!.:,()]{3,60}$/.test(title);
+  
+    if (!titleOk){
+        showFieldError(titleEl,'3‑60 letters/numbers & basic punctuation only');
+        hasError = true;
     }
-
+    if (!description){
+        showFieldError(descEl,'Description is required');
+        hasError = true;
+    }
+    if (isNaN(price) || price < 0.25){
+        showFieldError(priceEl,'Price must be at least $0.25');
+        hasError = true;
+    }
+    if (!categoryId){
+        showFieldError(catEl,'Choose a category');
+        hasError = true;
+    }
+    if (hasError) return;      //  stop if anything failed
+    /* -------------------------------- */
+  
+    // sanitise user‑supplied strings
+    const safeTitle       = sanitize(title);
+    const safeDescription = sanitize(description);
+  
+    const fd = new FormData();
+    fd.append('title',        safeTitle);
+    fd.append('description',  safeDescription);
+    fd.append('price',        price);
+    fd.append('category_id',  categoryId);
+    if (fileInput.files[0])   fd.append('file',      fileInput.files[0]);
+    if (thumbInput.files[0])  fd.append('thumbnail', thumbInput.files[0]);
+  
+    try {
+        const item = await apiRequest('/items','POST',fd);
+        showAlert('Item listed successfully!','success');
+        navigateTo('item',{ itemId:item.item_id });
+    } catch (err){
+        showAlert('Failed to list item: '+err.message,'danger');
+        console.error(err);
+    }
+  }
+  
     // Alerts Page Functions
     // Load user alerts
     async function loadAlerts() {
