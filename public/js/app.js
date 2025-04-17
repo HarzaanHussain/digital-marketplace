@@ -27,6 +27,11 @@ const sanitize = str => {
     e.textContent = msg;
     el.after(e);
   };
+
+  const clearFieldErrors = formEl => {
+    formEl.querySelectorAll('.field-error').forEach(e => e.remove());
+  };
+  
   /* ------------------------------------------- */
   
 
@@ -313,66 +318,32 @@ const sanitize = str => {
                 loadSales();
                 break;
 
+                 /* ---------- SELL PAGE ---------- */
             case 'sell':
-                if (!state.user) {
-                    navigateTo('login');
-                    return;
+            // 1️⃣ must be logged‑in
+            if (!state.user) {
+                navigateTo('login');
+                return;
                 }
 
+                // 2️⃣ render template & populate category <select>
                 renderTemplate('sell-template', pageContent);
                 loadCategoriesForSell();
 
+                // 3️⃣ wire up the form
                 const sellForm = document.getElementById('sell-form');
-                sellForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                clearFieldErrors(sellForm);
 
-                const titleEl    = document.getElementById('item-title-input');
-                const descEl     = document.getElementById('item-description-input');
-                const priceEl    = document.getElementById('item-price-input');
-                const categoryEl = document.getElementById('item-category-input');
-                const fileInput  = document.getElementById('item-file-input');
-                const thumbInput = document.getElementById('item-thumbnail-input');
-
-                let hasError = false;
-                const title       = titleEl.value.trim();
-                const description = descEl.value.trim();
-                const price       = parseFloat(priceEl.value);
-                const categoryId  = categoryEl.value;
-
-                if (!title)       { showFieldError(titleEl, 'Title is required'); hasError = true; }
-                if (!description) { showFieldError(descEl, 'Description is required'); hasError = true; }
-                if (isNaN(price) || price <= 0) {
-                    showFieldError(priceEl, 'Enter a valid price (> 0)'); hasError = true;
-                }
-                if (!categoryId)  { showFieldError(categoryEl, 'Please select a category'); hasError = true; }
-
-                if (hasError) return;
-
-                // sanitize
-                const safeTitle       = sanitizeInput(title);
-                const safeDescription = sanitizeInput(description);
-
-                const formData = new FormData();
-                formData.append('title', safeTitle);
-                formData.append('description', safeDescription);
-                formData.append('price', price);
-                formData.append('category_id', categoryId);
-                if (fileInput.files[0])  formData.append('file', fileInput.files[0]);
-                if (thumbInput.files[0]) formData.append('thumbnail', thumbInput.files[0]);
-
-                try {
-                    const item = await apiRequest('/items', 'POST', formData);
-                    showAlert('Item listed successfully!', 'success');
-                    navigateTo('item', { itemId: item.item_id });
-                } catch (err) {
-                    showAlert('Failed to list item: ' + err.message, 'danger');
-                }
+                //live validation as the user types 
+                sellForm.addEventListener('input', () => clearFieldErrors(sellForm));
                 
 
-                
+                sellForm.addEventListener('submit', e => {
+                    e.preventDefault();          // stay on the page
+                    sellItem();                  // call the real function below
                 });
-                break;
+
+            break;
+
 
             case 'alerts':
                 if (!state.user) {
@@ -1283,93 +1254,90 @@ const sanitize = str => {
     // Sell Page Functions
     // Load categories for sell form
     async function loadCategoriesForSell() {
-        const categoryInput = document.getElementById('item-category-input');
-        if (!categoryInput) return;
+                const categoryInput = document.getElementById('item-category-input');
+                if (!categoryInput) return;
 
-        try {
-            const categories = await apiRequest('/categories');
+                try {
+                    const categories = await apiRequest('/categories');
 
-            // Keep the first option
-            const firstOption = categoryInput.options[0];
-            categoryInput.innerHTML = '';
-            categoryInput.appendChild(firstOption);
+                    // Keep the first option
+                    const firstOption = categoryInput.options[0];
+                    categoryInput.innerHTML = '';
+                    categoryInput.appendChild(firstOption);
 
-            categories.forEach(category => {
-                const option = document.createElement('option');
-                option.value = category.category_id;
-                option.textContent = category.name;
-                categoryInput.appendChild(option);
-            });
-        } catch (error) {
-            console.error('Failed to load categories:', error);
+                    categories.forEach(category => {
+                        const option = document.createElement('option');
+                        option.value = category.category_id;
+                        option.textContent = category.name;
+                        categoryInput.appendChild(option);
+                    });
+                } catch (error) {
+                    console.error('Failed to load categories:', error);
+                }
+            }
+
+            
+            // Sell an item
+            // Sell an item  (replace the whole previous function)
+        async function sellItem () {
+            const form = document.getElementById('sell-form');
+            clearFieldErrors(form);
+        
+            // --- grab fields -------------------------------
+            const titleEl = document.getElementById('item-title-input');
+            const descEl  = document.getElementById('item-description-input');
+            const priceEl = document.getElementById('item-price-input');
+            const catEl   = document.getElementById('item-category-input');
+            const fileEl  = document.getElementById('item-file-input');
+            const thumbEl = document.getElementById('item-thumbnail-input');
+        
+            const title = titleEl.value.trim();
+            const description = descEl.value.trim();
+            const price = parseFloat(priceEl.value);
+            const categoryId = catEl.value;
+        
+            // --- client‑side validation --------------------
+            let bad = false;
+        
+            const titleOk = /^[\w\s\-&'!.:,()]{3,60}$/.test(title);
+            if (!titleOk) {
+            showFieldError(titleEl, '3‑60 letters/numbers & punctuation only');
+            bad = true;
+            }
+            if (!description) {
+            showFieldError(descEl, 'Description is required');
+            bad = true;
+            }
+            if (isNaN(price) || price < 0.25) {
+            showFieldError(priceEl, 'Price must be at least $0.25');
+            bad = true;
+            }
+            if (!categoryId) {
+            showFieldError(catEl, 'Choose a category');
+            bad = true;
+            }
+            if (bad) return;
+        
+            // --- build payload -----------------------------
+            const formData = new FormData();
+            formData.append('title',        sanitize(title));
+            formData.append('description',  sanitize(description));
+            formData.append('price',        price);
+            formData.append('category_id',  categoryId);
+            if (fileEl.files[0])  formData.append('file',      fileEl.files[0]);
+            if (thumbEl.files[0]) formData.append('thumbnail', thumbEl.files[0]);
+        
+            // --- send to API -------------------------------
+            try {
+            const item = await apiRequest('/items', 'POST', formData);
+            showAlert('Item listed successfully!', 'success');
+            navigateTo('item', { itemId: item.item_id });
+            } catch (err) {
+            showAlert('Failed to list item: ' + err.message, 'danger');
+            console.error(err);
+            }
         }
-    }
-
-    
-    // Sell an item
-async function sellItem () {
-
-    const form = document.getElementById('sell-form');
-    clearFieldErrors(form);                    // remove old inline errors
   
-    // grab elements only once
-    const titleEl    = document.getElementById('item-title-input');
-    const descEl     = document.getElementById('item-description-input');
-    const priceEl    = document.getElementById('item-price-input');
-    const catEl      = document.getElementById('item-category-input');
-    const fileInput  = document.getElementById('item-file-input');
-    const thumbInput = document.getElementById('item-thumbnail-input');
-  
-    // values
-    const title       = titleEl.value.trim();
-    const description = descEl.value.trim();
-    const price       = parseFloat(priceEl.value);
-    const categoryId  = catEl.value;
-  
-    /* ---------- validation ---------- */
-    let hasError = false;
-    const titleOk = /^[\w\s\-&'!.:,()]{3,60}$/.test(title);
-  
-    if (!titleOk){
-        showFieldError(titleEl,'3‑60 letters/numbers & basic punctuation only');
-        hasError = true;
-    }
-    if (!description){
-        showFieldError(descEl,'Description is required');
-        hasError = true;
-    }
-    if (isNaN(price) || price < 0.25){
-        showFieldError(priceEl,'Price must be at least $0.25');
-        hasError = true;
-    }
-    if (!categoryId){
-        showFieldError(catEl,'Choose a category');
-        hasError = true;
-    }
-    if (hasError) return;      //  stop if anything failed
-    /* -------------------------------- */
-  
-    // sanitise user‑supplied strings
-    const safeTitle       = sanitize(title);
-    const safeDescription = sanitize(description);
-  
-    const fd = new FormData();
-    fd.append('title',        safeTitle);
-    fd.append('description',  safeDescription);
-    fd.append('price',        price);
-    fd.append('category_id',  categoryId);
-    if (fileInput.files[0])   fd.append('file',      fileInput.files[0]);
-    if (thumbInput.files[0])  fd.append('thumbnail', thumbInput.files[0]);
-  
-    try {
-        const item = await apiRequest('/items','POST',fd);
-        showAlert('Item listed successfully!','success');
-        navigateTo('item',{ itemId:item.item_id });
-    } catch (err){
-        showAlert('Failed to list item: '+err.message,'danger');
-        console.error(err);
-    }
-  }
   
     // Alerts Page Functions
     // Load user alerts
