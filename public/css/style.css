@@ -88,7 +88,21 @@ nav a {
     color: var(--dark-color);
     font-weight: 500;
     transition: color 0.3s;
+    position: relative;
 }
+
+nav a::after {
+    content: "";
+    position: absolute;
+    left: 0; bottom: -4px;
+    width: 0; height: 2px;
+    background: var(--primary-color);
+    transition: width 0.3s;
+  }
+
+  nav a:hover::after, nav a.active::after {
+    width: 100%;
+  }
 
 nav a:hover {
     color: var(--primary-color);
