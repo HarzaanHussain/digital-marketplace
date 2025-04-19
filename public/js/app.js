@@ -646,7 +646,7 @@ const sanitize = str => {
         const container = document.getElementById('featured-items-container');
         if (!container) return;
 
-        container.innerHTML = '<div class="loading">Loading...</div>';
+        container.innerHTML = '<div class="loading"></div>';
 
         try {
             const items = await apiRequest('/items?limit=4');
