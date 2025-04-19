@@ -741,12 +741,12 @@ const sanitize = str => {
         }
 
         card.innerHTML = `
-            <div class="category-icon">
-                <i class="fas ${icon}"></i>
-            </div>
-            <div class="category-name">${category.name}</div>
-        `;
-
+        <div class="category-icon">
+          <i class="fas ${sanitize(icon)}"></i>
+        </div>
+        <div class="category-name">${sanitize(category.name)}</div>
+      `;
+      
         return card;
     }
 
@@ -800,18 +800,20 @@ const sanitize = str => {
         });
 
         // Default thumbnail if none provided
+        //  Sanitized
         const thumbnail = item.thumbnail_path || '/img/default-thumbnail.png';
 
-        card.innerHTML = `
+             card.innerHTML = `
             <div class="item-image">
-                <img src="${thumbnail}" alt="${item.title}">
+                <img src="${sanitize(thumbnail)}" alt="${sanitize(item.title)}">
             </div>
             <div class="item-details">
-                <h3 class="item-title">${item.title}</h3>
+                <h3 class="item-title">${sanitize(item.title)}</h3>
                 <div class="item-price">$${parseFloat(item.price).toFixed(2)}</div>
-                <div class="item-seller">by ${item.seller_name || 'Unknown'}</div>
+                <div class="item-seller">by ${sanitize(item.seller_name || 'Unknown')}</div>
             </div>
-        `;
+            `;
+
 
         return card;
     }
@@ -905,17 +907,18 @@ const sanitize = str => {
         reviewElement.className = 'review';
 
         const date = new Date(review.created_at).toLocaleDateString();
-
+        
         reviewElement.innerHTML = `
             <div class="review-header">
-                <span class="reviewer">${review.reviewer_name}</span>
-                <span class="review-date">${date}</span>
+                <span class="reviewer">${sanitize(review.reviewer_name)}</span>
+                <span class="review-date">${sanitize(date)}</span>
             </div>
             <div class="star-rating">
                 ${createStarRating(review.rating)}
             </div>
-            <div class="review-comment">${review.comment}</div>
-        `;
+            <div class="review-comment">${sanitize(review.comment)}</div>
+            `;
+
 
         return reviewElement;
     }
@@ -1157,13 +1160,13 @@ const sanitize = str => {
         element.className = 'purchase-card';
 
         const date = new Date(purchase.purchase_date).toLocaleDateString();
-
+            //sanitized
         element.innerHTML = `
             <div class="purchase-image">
-                <img src="${purchase.thumbnail_path || '/img/default-thumbnail.png'}" alt="${purchase.title}">
+                <img src="${sanitize(purchase.thumbnail_path) || '/img/default-thumbnail.png'}" alt="${sanitize(purchase.title)}">
             </div>
             <div class="purchase-details">
-                <div class="purchase-title">${purchase.title}</div>
+                <div class="purchase-title">${sanitize(purchase.title)}</div>
                 <div class="purchase-price">$${parseFloat(purchase.purchase_price).toFixed(2)}</div>
                 <div class="purchase-date">Purchased on ${date}</div>
             </div>
@@ -1218,10 +1221,10 @@ const sanitize = str => {
 
         element.innerHTML = `
             <div class="sale-image">
-                <img src="${sale.thumbnail_path || '/img/default-thumbnail.png'}" alt="${sale.title}">
+                <img src="${sanitize(sale.thumbnail_path) || '/img/default-thumbnail.png'}" alt="${sanitize(sale.title)}">
             </div>
             <div class="sale-details">
-                <div class="sale-title">${sale.title}</div>
+                <div class="sale-title">${sanitize(sale.title)}</div>
                 <div class="sale-price">$${parseFloat(sale.price).toFixed(2)}</div>
                 <div class="sale-date">Listed on ${new Date(sale.created_at).toLocaleDateString()}</div>
             </div>
@@ -1404,12 +1407,12 @@ const sanitize = str => {
                 alertTitle = 'Alert';
                 alertInfo = 'You have a new alert';
         }
-
+            //sanitized
         element.innerHTML = `
             <div class="alert-content">
-                <div class="alert-title">${alertTitle}</div>
-                <div class="alert-info">${alertInfo}</div>
-                <div class="alert-date">${new Date(alert.created_at).toLocaleString()}</div>
+                   <div class="alert-title">${sanitize(alertTitle)}</div>
+                    <div class="alert-info">${sanitize(alertInfo)}</div>
+                    <div class="alert-date">${sanitize(new Date(alert.created_at).toLocaleString())}</div>
             </div>
             <div class="alert-actions">
                 ${!alert.is_read ? `<button class="btn btn-secondary" data-action="markRead">Mark as Read</button>` : ''}
