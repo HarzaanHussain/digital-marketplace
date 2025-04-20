@@ -9,33 +9,6 @@ document.addEventListener('DOMContentLoaded', () => {
         notificationCount: 0
     };
 
-    
-
-   /* ---------- Sanitation helper utilities ---------- */
-const sanitize = str => {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;           // encoded version
-  };
-  
-  const showFieldError = (el, msg) => {
-    const old = el.nextElementSibling;
-    if (old?.classList.contains('field-error')) old.remove();
-  
-    const e = document.createElement('div');
-    e.className = 'field-error';
-    e.textContent = msg;
-    el.after(e);
-  };
-
-  const clearFieldErrors = formEl => {
-    formEl.querySelectorAll('.field-error').forEach(e => e.remove());
-  };
-  
-  /* ------------------------------------------- */
-  
-
-
     // API Base URL
     const API_URL = '/api';
 
@@ -66,7 +39,13 @@ const sanitize = str => {
         // Load initial page
         const pageFromHash = window.location.hash.substring(1);
         if (pageFromHash) {
-            navigateTo(pageFromHash);
+            const parts = pageFromHash.split('/');
+            if (parts[0] === 'item' && parts[1]) {
+                // Handle deep link to item page
+                navigateTo('item', { itemId: parts[1] });
+            } else {
+                navigateTo(pageFromHash);
+            }
         } else {
             navigateTo('home');
         }
@@ -91,6 +70,20 @@ const sanitize = str => {
 
         // Handle form submissions and other events based on the current page
         document.addEventListener('click', handleClick);
+
+        // Handle direct price update button clicks
+        document.addEventListener('click', function(e) {
+            if (e.target && e.target.id === 'update-price-button') {
+                submitPriceUpdate();
+            }
+        });
+
+        // Handle close dialog button clicks
+        document.addEventListener('click', function(e) {
+            if (e.target && e.target.classList.contains('close-button')) {
+                closePriceEditDialog();
+            }
+        });
     }
 
     // Handle click events
@@ -110,49 +103,62 @@ const sanitize = str => {
                     closeAlert(e.target.closest('.alert'));
                     break;
                 case 'viewItem':
-                    const itemId = e.target.closest('.item-card').dataset.id;
-                    viewItem(itemId);
+                    const itemCardEl = e.target.closest('.item-card');
+                    if (itemCardEl && itemCardEl.dataset.id) {
+                        viewItem(itemCardEl.dataset.id);
+                    }
                     break;
                 case 'browseCategory':
-                    const categoryId = e.target.closest('.category-card').dataset.id;
-                    navigateTo('browse', { categoryId });
+                    const categoryCardEl = e.target.closest('.category-card');
+                    if (categoryCardEl && categoryCardEl.dataset.id) {
+                        navigateTo('browse', { categoryId: categoryCardEl.dataset.id });
+                    }
                     break;
                 case 'markRead':
-                    const alertId = e.target.closest('.alert-card').dataset.id;
-                    markAlertAsRead(alertId);
+                    const alertCardEl = e.target.closest('.alert-card');
+                    if (alertCardEl && alertCardEl.dataset.id) {
+                        markAlertAsRead(alertCardEl.dataset.id);
+                    }
                     break;
                 case 'markAllRead':
                     markAllAlertsAsRead();
                     break;
                 case 'markNotificationRead':
-                    const notificationId = e.target.closest('.notification-card').dataset.id;
-                    markNotificationAsRead(notificationId);
+                    const notificationCardEl = e.target.closest('.notification-card');
+                    if (notificationCardEl && notificationCardEl.dataset.id) {
+                        markNotificationAsRead(notificationCardEl.dataset.id);
+                    }
                     break;
                 case 'deleteAlert':
-                    const alertToDeleteId = e.target.closest('.alert-card').dataset.id;
-                    deleteAlert(alertToDeleteId);
+                    const alertToDeleteCardEl = e.target.closest('.alert-card');
+                    if (alertToDeleteCardEl && alertToDeleteCardEl.dataset.id) {
+                        deleteAlert(alertToDeleteCardEl.dataset.id);
+                    }
                     break;
                 case 'deleteItem':
-                    const itemToDeleteId = e.target.dataset.id;
-                    const itemTitle = e.target.closest('.sale-card')?.querySelector('.sale-title')?.textContent || 'this item';
-                    confirmDeleteItem(itemToDeleteId, itemTitle);
+                    if (e.target.dataset.id) {
+                        const itemTitle = e.target.closest('.sale-card')?.querySelector('.sale-title')?.textContent || 'this item';
+                        confirmDeleteItem(e.target.dataset.id, itemTitle);
+                    }
                     break;
                 case 'downloadItem':
-                    const downloadItemId = e.target.dataset.id;
-                    downloadPurchasedItem(downloadItemId);
+                    if (e.target.dataset.id) {
+                        downloadPurchasedItem(e.target.dataset.id);
+                    }
                     break;
                 case 'editItem':
-                    const editItemId = e.target.dataset.id;
-                    if (editItemId) {
-                        showPriceEditDialog(editItemId);
+                    const itemId = e.target.dataset.id || state.currentItemId;
+                    if (itemId) {
+                        showPriceEditDialog(itemId);
                     } else {
                         console.error('No item ID found for edit action');
                     }
                     break;
                 case 'editReview':
-                    const reviewId = e.target.dataset.id;
-                    const reviewElement = e.target.closest('.review');
-                    editReview(reviewId, reviewElement);
+                    if (e.target.dataset.id) {
+                        const reviewElement = e.target.closest('.review');
+                        editReview(e.target.dataset.id, reviewElement);
+                    }
                     break;
                 case 'cancelEditReview':
                     const cancelReview = e.target.closest('.review');
@@ -178,8 +184,15 @@ const sanitize = str => {
         state.currentPage = page;
         state.params = params;
 
-        // Update URL hash
-        window.location.hash = page;
+        // Save item ID in state if provided
+        if (page === 'item' && params.itemId) {
+            state.currentItemId = params.itemId;
+            // Update URL hash with item ID for deep linking
+            window.location.hash = `item/${params.itemId}`;
+        } else {
+            // Update URL hash
+            window.location.hash = page;
+        }
 
         // Clear page content
         const pageContent = document.getElementById('page-content');
@@ -219,15 +232,21 @@ const sanitize = str => {
                 loadCategories();
 
                 const searchButton = document.getElementById('search-button');
-                searchButton.addEventListener('click', () => {
-                    const searchInput = document.getElementById('search-input').value;
-                    loadItems({ search: searchInput });
-                });
+                if (searchButton) {
+                    searchButton.addEventListener('click', () => {
+                        const searchInput = document.getElementById('search-input');
+                        if (searchInput) {
+                            loadItems({ search: searchInput.value });
+                        }
+                    });
+                }
 
                 const categoryFilter = document.getElementById('category-filter');
-                categoryFilter.addEventListener('change', () => {
-                    loadItems({ category: categoryFilter.value });
-                });
+                if (categoryFilter) {
+                    categoryFilter.addEventListener('change', () => {
+                        loadItems({ category: categoryFilter.value });
+                    });
+                }
 
                 // Load items with initial params
                 loadItems(params);
@@ -240,9 +259,11 @@ const sanitize = str => {
 
                     // Set up back button
                     const backButton = document.getElementById('back-button');
-                    backButton.addEventListener('click', () => {
-                        navigateTo('browse');
-                    });
+                    if (backButton) {
+                        backButton.addEventListener('click', () => {
+                            navigateTo('browse');
+                        });
+                    }
 
                     // Set up review form
                     const reviewForm = document.getElementById('review-form');
@@ -259,8 +280,11 @@ const sanitize = str => {
                         stars.forEach(star => {
                             star.addEventListener('click', () => {
                                 const rating = star.dataset.rating;
-                                document.getElementById('rating-input').value = rating;
-                                updateStarRating(rating);
+                                const ratingInput = document.getElementById('rating-input');
+                                if (ratingInput) {
+                                    ratingInput.value = rating;
+                                    updateStarRating(rating);
+                                }
                             });
                         });
 
@@ -302,10 +326,12 @@ const sanitize = str => {
                 renderTemplate('login-template', pageContent);
 
                 const loginForm = document.getElementById('login-form');
-                loginForm.addEventListener('submit', (e) => {
-                    e.preventDefault();
-                    login();
-                });
+                if (loginForm) {
+                    loginForm.addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        login();
+                    });
+                }
                 break;
 
             case 'register':
@@ -317,10 +343,12 @@ const sanitize = str => {
                 renderTemplate('register-template', pageContent);
 
                 const registerForm = document.getElementById('register-form');
-                registerForm.addEventListener('submit', (e) => {
-                    e.preventDefault();
-                    register();
-                });
+                if (registerForm) {
+                    registerForm.addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        register();
+                    });
+                }
                 break;
 
             case 'profile':
@@ -334,23 +362,29 @@ const sanitize = str => {
 
                 // Set up profile form
                 const profileForm = document.getElementById('profile-form');
-                profileForm.addEventListener('submit', (e) => {
-                    e.preventDefault();
-                    updateProfile();
-                });
+                if (profileForm) {
+                    profileForm.addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        updateProfile();
+                    });
+                }
 
                 // Set up profile image upload
                 const profileImageUpload = document.getElementById('profile-image-upload');
-                profileImageUpload.addEventListener('change', () => {
-                    uploadProfileImage();
-                });
+                if (profileImageUpload) {
+                    profileImageUpload.addEventListener('change', () => {
+                        uploadProfileImage();
+                    });
+                }
 
                 // Set up tabs
                 const tabItems = document.querySelectorAll('.tab-item');
                 tabItems.forEach(item => {
                     item.addEventListener('click', () => {
                         const tab = item.dataset.tab;
-                        switchTab(tab);
+                        if (tab) {
+                            switchTab(tab);
+                        }
                     });
                 });
 
@@ -360,37 +394,26 @@ const sanitize = str => {
                 loadSellerNotifications();
                 break;
 
-                 /* ---------- SELL PAGE ---------- */
             case 'sell':
-            // 1️⃣ must be logged‑in
-            if (!state.user) {
-                navigateTo('login');
-                return;
+                if (!state.user) {
+                    navigateTo('login');
+                    return;
                 }
 
-                // 2️⃣ render template & populate category <select>
                 renderTemplate('sell-template', pageContent);
                 
                 // Load categories
                 await loadCategoriesForSell();
                 
                 // Add submit handler for form
-                // 3️⃣ wire up the form
                 const sellForm = document.getElementById('sell-form');
                 if (sellForm) {
-    
-                //live validation as the user types 
-                sellForm.addEventListener('input', () => clearFieldErrors(sellForm));
-                
-
-                sellForm.addEventListener('submit', e => {
-                        e.preventDefault();          // stay on the page
-                        sellItem();                  // call the real function below
+                    sellForm.addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        sellItem();
                     });
                 }
-
-            break;
-
+                break;
 
             case 'alerts':
                 if (!state.user) {
@@ -403,9 +426,11 @@ const sanitize = str => {
 
                 // Set up new alert button
                 const newAlertButton = document.getElementById('new-alert-button');
-                newAlertButton.addEventListener('click', () => {
-                    openNewAlertModal();
-                });
+                if (newAlertButton) {
+                    newAlertButton.addEventListener('click', () => {
+                        openNewAlertModal();
+                    });
+                }
 
                 // Set up mark all as read button
                 const markAllReadButton = document.getElementById('mark-all-read-button');
@@ -417,22 +442,28 @@ const sanitize = str => {
 
                 // Set up modal close
                 const closeModalBtn = document.querySelector('.close-modal');
-                closeModalBtn.addEventListener('click', () => {
-                    closeModal();
-                });
+                if (closeModalBtn) {
+                    closeModalBtn.addEventListener('click', () => {
+                        closeModal();
+                    });
+                }
 
                 // Set up new alert form
                 const newAlertForm = document.getElementById('new-alert-form');
-                newAlertForm.addEventListener('submit', (e) => {
-                    e.preventDefault();
-                    createAlert();
-                });
+                if (newAlertForm) {
+                    newAlertForm.addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        createAlert();
+                    });
+                }
 
                 // Set up alert type change
                 const alertTypeInput = document.getElementById('alert-type-input');
-                alertTypeInput.addEventListener('change', () => {
-                    updateAlertForm();
-                });
+                if (alertTypeInput) {
+                    alertTypeInput.addEventListener('change', () => {
+                        updateAlertForm();
+                    });
+                }
 
                 // Load alert types, categories, and items for the form
                 loadAlertTypes();
@@ -478,26 +509,34 @@ const sanitize = str => {
                 dialog.className = 'modal';
                 dialog.innerHTML = `
                     <div class="modal-content">
-                        <span class="close-button" data-action="closePriceEditDialog">&times;</span>
+                        <span class="close-button">&times;</span>
                         <h3>Edit Price for "${item.title}"</h3>
                         <div class="form-group">
                             <label for="edit-price-input">New Price ($)</label>
                             <input type="number" id="edit-price-input" min="0.01" step="0.01" value="${item.price}" required>
                         </div>
                         <input type="hidden" id="edit-item-id" value="${item.item_id}">
-                        <button id="update-price-button" class="btn btn-primary">Update Price</button>
+                        <button type="button" id="update-price-button" class="btn btn-primary">Update Price</button>
                     </div>
                 `;
-
+    
                 // Add to the page
                 document.body.appendChild(dialog);
                 
-                // Add direct event listener
-                const updateButton = document.getElementById('update-price-button');
-                updateButton.addEventListener('click', submitPriceUpdate);
-                
                 // Show the dialog
                 dialog.style.display = 'block';
+                
+                // Set up direct event listeners without event delegation
+                const updateButton = document.getElementById('update-price-button');
+                if (updateButton) {
+                    // Use a one-time event listener to prevent double-firing
+                    updateButton.addEventListener('click', submitPriceUpdate, { once: true });
+                }
+                
+                const closeButton = dialog.querySelector('.close-button');
+                if (closeButton) {
+                    closeButton.addEventListener('click', closePriceEditDialog);
+                }
             })
             .catch(error => {
                 showAlert('Failed to load item: ' + error.message, 'danger');
@@ -513,7 +552,10 @@ const sanitize = str => {
     }
 
     // Submit price update
-    function submitPriceUpdate() {
+    function submitPriceUpdate(e) {
+        // Prevent any event bubbling
+        if (e) e.stopPropagation();
+        
         const itemIdElement = document.getElementById('edit-item-id');
         const priceElement = document.getElementById('edit-price-input');
         
@@ -535,10 +577,14 @@ const sanitize = str => {
             showAlert('Please enter a valid price greater than 0', 'warning');
             return;
         }
-
+    
         // Create FormData with just the price
         const formData = new FormData();
         formData.append('price', newPrice);
+        
+        // Disable the button to prevent double-click
+        const updateButton = document.getElementById('update-price-button');
+        if (updateButton) updateButton.disabled = true;
         
         // Update the item with just the price change
         apiRequest(`/items/${itemId}`, 'PUT', formData)
@@ -557,8 +603,11 @@ const sanitize = str => {
             })
             .catch(error => {
                 showAlert('Failed to update price: ' + error.message, 'danger');
+                // Re-enable the button if there was an error
+                if (updateButton) updateButton.disabled = false;
             });
     }
+    
 
     // Load categories for sell form
     async function loadCategoriesForSell() {
@@ -599,12 +648,22 @@ const sanitize = str => {
 
     // Sell a new item
     async function sellItem() {
-        const title = document.getElementById('item-title-input').value.trim();
-        const description = document.getElementById('item-description-input').value.trim();
-        const price = document.getElementById('item-price-input').value;
-        const categoryId = document.getElementById('item-category-input').value;
+        const titleInput = document.getElementById('item-title-input');
+        const descriptionInput = document.getElementById('item-description-input');
+        const priceInput = document.getElementById('item-price-input');
+        const categoryInput = document.getElementById('item-category-input');
         const fileInput = document.getElementById('item-file-input');
         const thumbnailInput = document.getElementById('item-thumbnail-input');
+        
+        if (!titleInput || !priceInput || !categoryInput) {
+            showAlert('Form elements not found', 'danger');
+            return;
+        }
+        
+        const title = titleInput.value.trim();
+        const description = descriptionInput ? descriptionInput.value.trim() : '';
+        const price = priceInput.value;
+        const categoryId = categoryInput.value;
         
         // Validation
         if (!title) {
@@ -629,12 +688,12 @@ const sanitize = str => {
         formData.append('category_id', categoryId);
 
         // Only append file if one is selected
-        if (fileInput.files[0]) {
+        if (fileInput && fileInput.files[0]) {
             formData.append('file', fileInput.files[0]);
         }
 
         // Only append thumbnail if one is selected
-        if (thumbnailInput.files[0]) {
+        if (thumbnailInput && thumbnailInput.files[0]) {
             formData.append('thumbnail', thumbnailInput.files[0]);
         }
 
@@ -645,7 +704,11 @@ const sanitize = str => {
             showAlert('Item listed successfully!', 'success');
 
             // Navigate to item page
-            navigateTo('item', { itemId: item.item_id });
+            if (item && item.item_id) {
+                navigateTo('item', { itemId: item.item_id });
+            } else {
+                navigateTo('profile');
+            }
         } catch (error) {
             showAlert('Failed to list item: ' + (error.message || 'Unknown error'), 'danger');
         }
@@ -653,10 +716,15 @@ const sanitize = str => {
 
     // Edit a review
     function editReview(reviewId, reviewElement) {
+        if (!reviewElement) return;
+        
         // Store the original content to restore if canceled
         if (!reviewElement.dataset.originalRating) {
-            const ratingStars = reviewElement.querySelector('.star-rating').innerHTML;
-            const commentText = reviewElement.querySelector('.review-comment').textContent;
+            const ratingStars = reviewElement.querySelector('.star-rating')?.innerHTML;
+            const commentText = reviewElement.querySelector('.review-comment')?.textContent;
+            
+            if (!ratingStars || !commentText) return;
+            
             reviewElement.dataset.originalRating = ratingStars;
             reviewElement.dataset.originalComment = commentText;
             reviewElement.dataset.reviewId = reviewId;
@@ -689,8 +757,12 @@ const sanitize = str => {
             `;
             
             // Replace the review content with the edit form
-            reviewElement.querySelector('.review-comment').style.display = 'none';
-            reviewElement.querySelector('.star-rating').style.display = 'none';
+            const reviewCommentEl = reviewElement.querySelector('.review-comment');
+            const starRatingEl = reviewElement.querySelector('.star-rating');
+            
+            if (reviewCommentEl) reviewCommentEl.style.display = 'none';
+            if (starRatingEl) starRatingEl.style.display = 'none';
+            
             reviewElement.appendChild(editForm);
             
             // Add star rating functionality
@@ -698,7 +770,10 @@ const sanitize = str => {
             editStars.forEach(star => {
                 star.addEventListener('click', () => {
                     const rating = star.dataset.rating;
-                    editForm.querySelector('.edit-rating-input').value = rating;
+                    const ratingInput = editForm.querySelector('.edit-rating-input');
+                    if (ratingInput) {
+                        ratingInput.value = rating;
+                    }
                     
                     // Update star display
                     editStars.forEach(s => {
@@ -723,9 +798,21 @@ const sanitize = str => {
 
     // Submit review edit
     async function submitReviewEdit(reviewId, reviewElement) {
+        if (!reviewElement) return;
+        
         const editForm = reviewElement.querySelector('.edit-review-form');
-        const rating = editForm.querySelector('.edit-rating-input').value;
-        const comment = editForm.querySelector('.edit-comment').value;
+        if (!editForm) return;
+        
+        const ratingInput = editForm.querySelector('.edit-rating-input');
+        const commentInput = editForm.querySelector('.edit-comment');
+        
+        if (!ratingInput || !commentInput) {
+            showAlert('Form elements not found', 'danger');
+            return;
+        }
+        
+        const rating = ratingInput.value;
+        const comment = commentInput.value;
         
         // Validate rating
         if (!rating || isNaN(parseInt(rating)) || parseInt(rating) < 1 || parseInt(rating) > 5) {
@@ -744,13 +831,17 @@ const sanitize = str => {
             // Update the review display with the new star rating
             const updatedStarRating = createStarRating(rating);
             
-            reviewElement.querySelector('.star-rating').innerHTML = updatedStarRating;
-            reviewElement.querySelector('.review-comment').textContent = comment;
+            const starRatingEl = reviewElement.querySelector('.star-rating');
+            const reviewCommentEl = reviewElement.querySelector('.review-comment');
+            
+            if (starRatingEl) starRatingEl.innerHTML = updatedStarRating;
+            if (reviewCommentEl) reviewCommentEl.textContent = comment;
             
             // Remove form and show original content
             reviewElement.removeChild(editForm);
-            reviewElement.querySelector('.review-comment').style.display = 'block';
-            reviewElement.querySelector('.star-rating').style.display = 'block';
+            
+            if (starRatingEl) starRatingEl.style.display = 'block';
+            if (reviewCommentEl) reviewCommentEl.style.display = 'block';
             
             // Clear stored originals
             delete reviewElement.dataset.originalRating;
@@ -764,6 +855,8 @@ const sanitize = str => {
 
     // Cancel review edit
     function cancelEditReview(reviewElement) {
+        if (!reviewElement) return;
+        
         // Remove the edit form
         const editForm = reviewElement.querySelector('.edit-review-form');
         if (editForm) {
@@ -771,8 +864,11 @@ const sanitize = str => {
         }
         
         // Show original content
-        reviewElement.querySelector('.review-comment').style.display = 'block';
-        reviewElement.querySelector('.star-rating').style.display = 'block';
+        const reviewCommentEl = reviewElement.querySelector('.review-comment');
+        const starRatingEl = reviewElement.querySelector('.star-rating');
+        
+        if (reviewCommentEl) reviewCommentEl.style.display = 'block';
+        if (starRatingEl) starRatingEl.style.display = 'block';
         
         // Clear stored originals
         delete reviewElement.dataset.originalRating;
@@ -782,6 +878,11 @@ const sanitize = str => {
 
     // Confirm delete item dialog
     function confirmDeleteItem(itemId, title) {
+        if (!itemId) {
+            showAlert('Invalid item ID', 'danger');
+            return;
+        }
+        
         if (confirm(`Are you sure you want to delete "${title}"? This cannot be undone.`)) {
             deleteItem(itemId);
         }
@@ -789,6 +890,11 @@ const sanitize = str => {
 
     // Delete an item
     async function deleteItem(itemId) {
+        if (!itemId) {
+            showAlert('Invalid item ID', 'danger');
+            return;
+        }
+        
         try {
             await apiRequest(`/items/${itemId}`, 'DELETE');
             
@@ -796,8 +902,8 @@ const sanitize = str => {
             
             // If on item detail page, navigate back to profile
             if (state.currentPage === 'item') {
-                navigateTo('home');
-                switchTab('home');
+                navigateTo('profile');
+                switchTab('sales');
             } else {
                 // If on profile page, just reload sales
                 loadSales();
@@ -809,6 +915,11 @@ const sanitize = str => {
 
     // Download a purchased item
     async function downloadPurchasedItem(itemId) {
+        if (!itemId) {
+            showAlert('Invalid item ID', 'danger');
+            return;
+        }
+        
         try {
             // Get the purchase ID from purchases data
             const purchasesResponse = await apiRequest('/purchases');
@@ -933,10 +1044,10 @@ const sanitize = str => {
     // API Requests
     // Make an API request
     async function apiRequest(endpoint, method = 'GET', data = null) {
-        // Prevent requests with undefined IDs
-        if (endpoint.includes('/undefined') || endpoint.includes('/null')) {
-            console.warn('Prevented request to invalid endpoint:', endpoint);
-            return Promise.reject(new Error('Invalid ID'));
+        // Check for valid endpoint
+        if (!endpoint || endpoint.includes('/undefined') || endpoint.includes('/null')) {
+            console.error('Invalid API endpoint:', endpoint);
+            return Promise.reject(new Error('Invalid request parameters'));
         }
 
         const headers = {
@@ -991,8 +1102,16 @@ const sanitize = str => {
     // Authentication Functions
     // Login user
     async function login() {
-        const email = document.getElementById('login-email').value;
-        const password = document.getElementById('login-password').value;
+        const emailInput = document.getElementById('login-email');
+        const passwordInput = document.getElementById('login-password');
+        
+        if (!emailInput || !passwordInput) {
+            showAlert('Form elements not found', 'danger');
+            return;
+        }
+        
+        const email = emailInput.value;
+        const password = passwordInput.value;
 
         try {
             const data = await apiRequest('/users/login', 'POST', { email, password });
@@ -1017,11 +1136,22 @@ const sanitize = str => {
 
     // Register user
     async function register() {
-        const username = document.getElementById('register-username').value;
-        const email = document.getElementById('register-email').value;
-        const fullName = document.getElementById('register-full-name').value;
-        const password = document.getElementById('register-password').value;
-        const confirmPassword = document.getElementById('register-confirm-password').value;
+        const usernameInput = document.getElementById('register-username');
+        const emailInput = document.getElementById('register-email');
+        const fullNameInput = document.getElementById('register-full-name');
+        const passwordInput = document.getElementById('register-password');
+        const confirmPasswordInput = document.getElementById('register-confirm-password');
+        
+        if (!usernameInput || !emailInput || !passwordInput || !confirmPasswordInput) {
+            showAlert('Form elements not found', 'danger');
+            return;
+        }
+        
+        const username = usernameInput.value;
+        const email = emailInput.value;
+        const fullName = fullNameInput ? fullNameInput.value : '';
+        const password = passwordInput.value;
+        const confirmPassword = confirmPasswordInput.value;
 
         if (password !== confirmPassword) {
             showAlert('Passwords do not match', 'danger');
@@ -1091,13 +1221,13 @@ const sanitize = str => {
         const container = document.getElementById('featured-items-container');
         if (!container) return;
 
-        container.innerHTML = '<div class="loading"></div>';
+        container.innerHTML = '<div class="loading">Loading...</div>';
 
         try {
             const response = await apiRequest('/items?limit=4');
             const items = response.items || response;
 
-            if (items.length === 0) {
+            if (!items || items.length === 0) {
                 container.innerHTML = '<p class="no-items">No items available</p>';
                 return;
             }
@@ -1185,12 +1315,12 @@ const sanitize = str => {
         }
 
         card.innerHTML = `
-        <div class="category-icon">
-          <i class="fas ${sanitize(icon)}"></i>
-        </div>
-        <div class="category-name">${sanitize(category.name)}</div>
-      `;
-      
+            <div class="category-icon">
+                <i class="fas ${icon}"></i>
+            </div>
+            <div class="category-name">${category.name}</div>
+        `;
+
         return card;
     }
 
@@ -1222,7 +1352,7 @@ const sanitize = str => {
             const items = response.items || response;
             const pagination = response.pagination;
 
-            if (items.length === 0) {
+            if (!items || items.length === 0) {
                 container.innerHTML = '<p class="no-items">No items found</p>';
                 return;
             }
@@ -1241,6 +1371,7 @@ const sanitize = str => {
             }
         } catch (error) {
             container.innerHTML = '<p class="error">Failed to load items</p>';
+            console.error('Error loading items:', error);
         }
     }
 
@@ -1284,6 +1415,8 @@ const sanitize = str => {
 
     // Create an item card element
     function createItemCard(item) {
+        if (!item || !item.item_id) return null;
+        
         const card = document.createElement('div');
         card.className = 'item-card';
         card.dataset.id = item.item_id;
@@ -1294,20 +1427,18 @@ const sanitize = str => {
         });
 
         // Default thumbnail if none provided
-        //  Sanitized
         const thumbnail = item.thumbnail_path || '/img/default-thumbnail.png';
 
-             card.innerHTML = `
+        card.innerHTML = `
             <div class="item-image">
-                <img src="${sanitize(thumbnail)}" alt="${sanitize(item.title)}">
+                <img src="${thumbnail}" alt="${item.title}">
             </div>
             <div class="item-details">
-                <h3 class="item-title">${sanitize(item.title)}</h3>
+                <h3 class="item-title">${item.title}</h3>
                 <div class="item-price">$${parseFloat(item.price).toFixed(2)}</div>
-                <div class="item-seller">by ${sanitize(item.seller_name || 'Unknown')}</div>
+                <div class="item-seller">by ${item.seller_name || 'Unknown'}</div>
             </div>
-            `;
-
+        `;
 
         return card;
     }
@@ -1334,17 +1465,31 @@ const sanitize = str => {
         try {
             const item = await apiRequest(`/items/${itemId}`);
 
+            if (!item) {
+                showAlert('Failed to load item details', 'danger');
+                navigateTo('browse');
+                return;
+            }
+
             // Update item details
-            document.getElementById('item-title').textContent = item.title;
-            document.getElementById('item-description').textContent = item.description;
-            document.getElementById('item-category').textContent = item.category_name;
-            document.getElementById('item-seller').textContent = item.seller_name;
-            document.getElementById('item-price').textContent = `$${parseFloat(item.price).toFixed(2)}`;
+            const titleEl = document.getElementById('item-title');
+            const descriptionEl = document.getElementById('item-description');
+            const categoryEl = document.getElementById('item-category');
+            const sellerEl = document.getElementById('item-seller');
+            const priceEl = document.getElementById('item-price');
+            
+            if (titleEl) titleEl.textContent = item.title;
+            if (descriptionEl) descriptionEl.textContent = item.description;
+            if (categoryEl) categoryEl.textContent = item.category_name;
+            if (sellerEl) sellerEl.textContent = item.seller_name;
+            if (priceEl) priceEl.textContent = `$${parseFloat(item.price).toFixed(2)}`;
 
             // Set thumbnail
             const thumbnailImg = document.getElementById('item-thumbnail');
-            thumbnailImg.src = item.thumbnail_path || '/img/default-thumbnail.png';
-            thumbnailImg.alt = item.title;
+            if (thumbnailImg) {
+                thumbnailImg.src = item.thumbnail_path || '/img/default-thumbnail.png';
+                thumbnailImg.alt = item.title;
+            }
 
             // Load reviews
             loadReviews(item.reviews);
@@ -1353,6 +1498,8 @@ const sanitize = str => {
             const purchaseButton = document.getElementById('purchase-button');
             const setAlertButton = document.getElementById('set-alert-button');
             const itemActions = document.querySelector('.item-actions');
+
+            if (!purchaseButton || !itemActions) return;
 
             if (state.user && state.user.user_id === item.seller_id) {
                 // Item owner view - show edit and delete buttons
@@ -1416,6 +1563,7 @@ const sanitize = str => {
             }
         } catch (error) {
             showAlert('Failed to load item details: ' + error.message, 'danger');
+            navigateTo('browse');
         }
     }
 
@@ -1433,17 +1581,21 @@ const sanitize = str => {
 
         reviews.forEach(review => {
             const reviewElement = createReviewElement(review);
-            container.appendChild(reviewElement);
+            if (reviewElement) {
+                container.appendChild(reviewElement);
+            }
         });
     }
 
     // Create a review element
     function createReviewElement(review) {
+        if (!review) return null;
+        
         const reviewElement = document.createElement('div');
         reviewElement.className = 'review';
 
         const date = new Date(review.created_at).toLocaleDateString();
-                
+        
         // Check if this is the current user's review
         const isUserReview = state.user && review.reviewer_id === state.user.user_id;
         
@@ -1457,22 +1609,22 @@ const sanitize = str => {
 
         reviewElement.innerHTML = `
             <div class="review-header">
-                <span class="reviewer">${sanitize(review.reviewer_name)}</span>
-                <span class="review-date">${sanitize(date)}</span>
+                <span class="reviewer">${review.reviewer_name}</span>
+                <span class="review-date">${date}</span>
+                ${editButton}
             </div>
             <div class="star-rating">
                 ${createStarRating(review.rating)}
             </div>
-            <div class="review-comment">${review.comment}</div>
+            <div class="review-comment">${review.comment || ''}</div>
         `;
-
 
         return reviewElement;
     }
 
     // Create star rating HTML
     function createStarRating(rating) {
-        rating = parseInt(rating);
+        rating = parseInt(rating) || 0;
         let stars = '';
         for (let i = 1; i <= 5; i++) {
             if (i <= rating) {
@@ -1487,7 +1639,7 @@ const sanitize = str => {
     // Update star rating display
     function updateStarRating(rating) {
         // Convert rating to number
-        rating = parseInt(rating);
+        rating = parseInt(rating) || 5;
         // Find all star icons
         const stars = document.querySelectorAll('.star-rating i');
 
@@ -1504,13 +1656,29 @@ const sanitize = str => {
         });
 
         // Set the hidden input value
-        document.getElementById('rating-input').value = rating;
+        const ratingInput = document.getElementById('rating-input');
+        if (ratingInput) {
+            ratingInput.value = rating;
+        }
     }
 
     // Submit a review
     async function submitReview(itemId) {
-        const rating = document.getElementById('rating-input').value;
-        const comment = document.getElementById('review-comment').value;
+        if (!itemId) {
+            showAlert('Invalid item ID', 'danger');
+            return;
+        }
+        
+        const ratingInput = document.getElementById('rating-input');
+        const commentInput = document.getElementById('review-comment');
+        
+        if (!ratingInput || !commentInput) {
+            showAlert('Form elements not found', 'danger');
+            return;
+        }
+        
+        const rating = ratingInput.value;
+        const comment = commentInput.value;
 
         if (!rating) {
             showAlert('Please select a rating', 'warning');
@@ -1530,7 +1698,7 @@ const sanitize = str => {
             loadItem(itemId);
 
             // Clear form
-            document.getElementById('review-comment').value = '';
+            commentInput.value = '';
             updateStarRating(5);
         } catch (error) {
             showAlert('Failed to submit review: ' + error.message, 'danger');
@@ -1539,6 +1707,11 @@ const sanitize = str => {
 
     // Purchase an item
     async function purchaseItem(itemId) {
+        if (!itemId) {
+            showAlert('Invalid item ID', 'danger');
+            return;
+        }
+        
         // Confirm the purchase
         if (!confirm('Are you sure you want to purchase this item?')) {
             return;
@@ -1559,6 +1732,11 @@ const sanitize = str => {
 
     // Open set alert modal for an item
     function openSetAlertModal(itemId) {
+        if (!itemId) {
+            showAlert('Invalid item ID', 'danger');
+            return;
+        }
+        
         // First check if the user has already purchased this item
         if (state.user) {
             apiRequest('/purchases')
@@ -1635,13 +1813,19 @@ const sanitize = str => {
             const profile = await fetchUserProfile();
 
             // Update profile form
-            document.getElementById('profile-username').value = profile.username;
-            document.getElementById('profile-email').value = profile.email;
-            document.getElementById('profile-full-name').value = profile.full_name || '';
+            const usernameInput = document.getElementById('profile-username');
+            const emailInput = document.getElementById('profile-email');
+            const fullNameInput = document.getElementById('profile-full-name');
+            
+            if (usernameInput) usernameInput.value = profile.username;
+            if (emailInput) emailInput.value = profile.email;
+            if (fullNameInput) fullNameInput.value = profile.full_name || '';
 
             // Update profile image
             const profileImage = document.getElementById('profile-image');
-            profileImage.src = profile.profile_image || '/img/default-profile.png';
+            if (profileImage) {
+                profileImage.src = profile.profile_image || '/img/default-profile.png';
+            }
         } catch (error) {
             showAlert('Failed to load profile', 'danger');
         }
@@ -1649,10 +1833,20 @@ const sanitize = str => {
 
     // Update user profile
     async function updateProfile() {
-        const username = document.getElementById('profile-username').value;
-        const email = document.getElementById('profile-email').value;
-        const fullName = document.getElementById('profile-full-name').value;
-        const password = document.getElementById('profile-password').value;
+        const usernameInput = document.getElementById('profile-username');
+        const emailInput = document.getElementById('profile-email');
+        const fullNameInput = document.getElementById('profile-full-name');
+        const passwordInput = document.getElementById('profile-password');
+        
+        if (!usernameInput || !emailInput) {
+            showAlert('Form elements not found', 'danger');
+            return;
+        }
+        
+        const username = usernameInput.value;
+        const email = emailInput.value;
+        const fullName = fullNameInput ? fullNameInput.value : '';
+        const password = passwordInput ? passwordInput.value : '';
 
         const data = {
             username,
@@ -1677,7 +1871,9 @@ const sanitize = str => {
             showAlert('Profile updated successfully!', 'success');
 
             // Clear password field
-            document.getElementById('profile-password').value = '';
+            if (passwordInput) {
+                passwordInput.value = '';
+            }
         } catch (error) {
             showAlert('Failed to update profile: ' + error.message, 'danger');
         }
@@ -1686,9 +1882,9 @@ const sanitize = str => {
     // Upload profile image
     async function uploadProfileImage() {
         const fileInput = document.getElementById('profile-image-upload');
+        if (!fileInput || !fileInput.files[0]) return;
+        
         const file = fileInput.files[0];
-
-        if (!file) return;
 
         const formData = new FormData();
         formData.append('profile_image', file);
@@ -1698,7 +1894,9 @@ const sanitize = str => {
 
             // Update profile image
             const profileImage = document.getElementById('profile-image');
-            profileImage.src = updatedProfile.profile_image;
+            if (profileImage && updatedProfile.profile_image) {
+                profileImage.src = updatedProfile.profile_image;
+            }
 
             showAlert('Profile image updated successfully!', 'success');
         } catch (error) {
@@ -1730,7 +1928,7 @@ const sanitize = str => {
             const response = await apiRequest('/purchases');
             const purchases = response.purchases || response;
 
-            if (purchases.length === 0) {
+            if (!purchases || purchases.length === 0) {
                 container.innerHTML = '<p class="no-items">No purchases yet</p>';
                 return;
             }
@@ -1739,7 +1937,9 @@ const sanitize = str => {
 
             purchases.forEach(purchase => {
                 const purchaseElement = createPurchaseElement(purchase);
-                container.appendChild(purchaseElement);
+                if (purchaseElement) {
+                    container.appendChild(purchaseElement);
+                }
             });
         } catch (error) {
             container.innerHTML = '<p class="error">Failed to load purchases</p>';
@@ -1756,7 +1956,7 @@ const sanitize = str => {
         try {
             const notifications = await apiRequest('/purchases/notifications');
 
-            if (notifications.length === 0) {
+            if (!notifications || notifications.length === 0) {
                 container.innerHTML = '<p class="no-items">No notifications yet</p>';
                 return;
             }
@@ -1765,7 +1965,9 @@ const sanitize = str => {
 
             notifications.forEach(notification => {
                 const notificationElement = createNotificationElement(notification);
-                container.appendChild(notificationElement);
+                if (notificationElement) {
+                    container.appendChild(notificationElement);
+                }
             });
             
             // Update notification count
@@ -1778,6 +1980,8 @@ const sanitize = str => {
 
     // Create notification element
     function createNotificationElement(notification) {
+        if (!notification) return null;
+        
         const element = document.createElement('div');
         element.className = 'notification-card';
         
@@ -1805,6 +2009,8 @@ const sanitize = str => {
 
     // Create purchase element
     function createPurchaseElement(purchase) {
+        if (!purchase) return null;
+        
         const element = document.createElement('div');
         element.className = 'purchase-card';
         
@@ -1818,13 +2024,13 @@ const sanitize = str => {
         // Add message for deleted items
         const deletedNotice = purchase.is_deleted ? 
             '<div class="deleted-notice">(Item no longer listed)</div>' : '';
-            //sanitized
+
         element.innerHTML = `
             <div class="purchase-image">
-                <img src="${sanitize(purchase.thumbnail_path) || '/img/default-thumbnail.png'}" alt="${sanitize(purchase.title)}">
+                <img src="${purchase.thumbnail_path || '/img/default-thumbnail.png'}" alt="${purchase.title}">
             </div>
             <div class="purchase-details">
-                <div class="purchase-title">${sanitize(purchase.title)}</div>
+                <div class="purchase-title">${purchase.title}</div>
                 ${deletedNotice}
                 <div class="purchase-price">$${parseFloat(purchase.purchase_price).toFixed(2)}</div>
                 <div class="purchase-date">Purchased on ${date}</div>
@@ -1850,7 +2056,7 @@ const sanitize = str => {
             const salesResponse = await apiRequest('/items?seller=' + state.user.user_id);
             const sales = salesResponse.items || salesResponse;
 
-            if (sales.length === 0) {
+            if (!sales || sales.length === 0) {
                 container.innerHTML = '<p class="no-items">No sales yet</p>';
                 return;
             }
@@ -1859,7 +2065,9 @@ const sanitize = str => {
 
             sales.forEach(sale => {
                 const saleElement = createSaleElement(sale);
-                container.appendChild(saleElement);
+                if (saleElement) {
+                    container.appendChild(saleElement);
+                }
             });
         } catch (error) {
             container.innerHTML = '<p class="error">Failed to load sales</p>';
@@ -1868,6 +2076,8 @@ const sanitize = str => {
 
     // Create sale element
     function createSaleElement(sale) {
+        if (!sale) return null;
+        
         const element = document.createElement('div');
         element.className = 'sale-card';
         
@@ -1878,10 +2088,10 @@ const sanitize = str => {
 
         element.innerHTML = `
             <div class="sale-image">
-                <img src="${sanitize(sale.thumbnail_path) || '/img/default-thumbnail.png'}" alt="${sanitize(sale.title)}">
+                <img src="${sale.thumbnail_path || '/img/default-thumbnail.png'}" alt="${sale.title}">
             </div>
             <div class="sale-details">
-                <div class="sale-title">${sanitize(sale.title)}</div>
+                <div class="sale-title">${sale.title}</div>
                 <div class="sale-price">$${parseFloat(sale.price).toFixed(2)}</div>
                 <div class="sale-date">Listed on ${new Date(sale.created_at).toLocaleDateString()}</div>
                 ${sale.is_deleted ? '<div class="deleted-notice">(No longer listed)</div>' : ''}
@@ -1901,94 +2111,6 @@ const sanitize = str => {
         return element;
     }
 
-    // Sell Page Functions
-    // Load categories for sell form
-    async function loadCategoriesForSell() {
-                const categoryInput = document.getElementById('item-category-input');
-                if (!categoryInput) return;
-
-                try {
-                    const categories = await apiRequest('/categories');
-
-                    // Keep the first option
-                    const firstOption = categoryInput.options[0];
-                    categoryInput.innerHTML = '';
-                    categoryInput.appendChild(firstOption);
-
-                    categories.forEach(category => {
-                        const option = document.createElement('option');
-                        option.value = category.category_id;
-                        option.textContent = category.name;
-                        categoryInput.appendChild(option);
-                    });
-                } catch (error) {
-                    console.error('Failed to load categories:', error);
-                }
-            }
-
-            
-            // Sell an item
-            // Sell an item  (replace the whole previous function)
-        async function sellItem () {
-            const form = document.getElementById('sell-form');
-            clearFieldErrors(form);
-        
-            // --- grab fields -------------------------------
-            const titleEl = document.getElementById('item-title-input');
-            const descEl  = document.getElementById('item-description-input');
-            const priceEl = document.getElementById('item-price-input');
-            const catEl   = document.getElementById('item-category-input');
-            const fileEl  = document.getElementById('item-file-input');
-            const thumbEl = document.getElementById('item-thumbnail-input');
-        
-            const title = titleEl.value.trim();
-            const description = descEl.value.trim();
-            const price = parseFloat(priceEl.value);
-            const categoryId = catEl.value;
-        
-            // --- client‑side validation --------------------
-            let bad = false;
-        
-            const titleOk = /^[\w\s\-&'!.:,()]{3,60}$/.test(title);
-            if (!titleOk) {
-            showFieldError(titleEl, '3‑60 letters/numbers & punctuation only');
-            bad = true;
-            }
-            if (!description) {
-            showFieldError(descEl, 'Description is required');
-            bad = true;
-            }
-            if (isNaN(price) || price < 0.25) {
-            showFieldError(priceEl, 'Price must be at least $0.25');
-            bad = true;
-            }
-            if (!categoryId) {
-            showFieldError(catEl, 'Choose a category');
-            bad = true;
-            }
-            if (bad) return;
-        
-            // --- build payload -----------------------------
-            const formData = new FormData();
-            formData.append('title',        sanitize(title));
-            formData.append('description',  sanitize(description));
-            formData.append('price',        price);
-            formData.append('category_id',  categoryId);
-            if (fileEl.files[0])  formData.append('file',      fileEl.files[0]);
-            if (thumbEl.files[0]) formData.append('thumbnail', thumbEl.files[0]);
-        
-            // --- send to API -------------------------------
-            try {
-            const item = await apiRequest('/items', 'POST', formData);
-            showAlert('Item listed successfully!', 'success');
-            navigateTo('item', { itemId: item.item_id });
-            } catch (err) {
-            showAlert('Failed to list item: ' + err.message, 'danger');
-            console.error(err);
-            }
-        }
-  
-  
     // Alerts Page Functions
     // Load user alerts
     async function loadAlerts() {
@@ -2001,7 +2123,7 @@ const sanitize = str => {
             const alertsResponse = await apiRequest('/alerts');
             const alerts = alertsResponse.alerts || alertsResponse;
 
-            if (alerts.length === 0) {
+            if (!alerts || alerts.length === 0) {
                 container.innerHTML = '<p class="no-alerts">No alerts set</p>';
                 return;
             }
@@ -2010,7 +2132,9 @@ const sanitize = str => {
 
             alerts.forEach(alert => {
                 const alertElement = createAlertElement(alert);
-                container.appendChild(alertElement);
+                if (alertElement) {
+                    container.appendChild(alertElement);
+                }
             });
 
             // Update alert count
@@ -2023,6 +2147,8 @@ const sanitize = str => {
 
     // Create alert element
     function createAlertElement(alert) {
+        if (!alert) return null;
+        
         const element = document.createElement('div');
         element.className = 'alert-card';
         if (!alert.is_read) {
@@ -2057,12 +2183,12 @@ const sanitize = str => {
                 alertTitle = 'Alert';
                 alertInfo = 'You have a new alert';
         }
-            //sanitized
+
         element.innerHTML = `
             <div class="alert-content">
-                   <div class="alert-title">${sanitize(alertTitle)}</div>
-                    <div class="alert-info">${sanitize(alertInfo)}</div>
-                    <div class="alert-date">${sanitize(new Date(alert.created_at).toLocaleString())}</div>
+                <div class="alert-title">${alertTitle}</div>
+                <div class="alert-info">${alertInfo}</div>
+                <div class="alert-date">${new Date(alert.created_at).toLocaleString()}</div>
             </div>
             <div class="alert-actions">
                 ${!alert.is_read ? `<button class="btn btn-secondary" data-action="markRead">Mark as Read</button>` : ''}
@@ -2273,7 +2399,10 @@ const sanitize = str => {
         const categoryInput = document.getElementById('alert-category-input');
         const priceInput = document.getElementById('alert-price-input');
         
-        if (!alertTypeInput) return;
+        if (!alertTypeInput) {
+            showAlert('Form elements not found', 'danger');
+            return;
+        }
         
         const alertTypeId = alertTypeInput.value;
         const itemId = itemInput ? itemInput.value : null;
