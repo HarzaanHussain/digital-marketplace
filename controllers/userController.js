@@ -1,6 +1,12 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
+const path = require('path');
+const fs = require('fs');
+const { v4: uuidv4 } = require('uuid');
+
+// Email validation regex
+const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 // Generate JWT
 const generateToken = (id) => {
@@ -14,10 +20,40 @@ const generateToken = (id) => {
 // @access  Public
 const registerUser = async (req, res) => {
   try {
+    await pool.query('START TRANSACTION');
+    
     const { username, email, password, full_name } = req.body;
 
-    if (!username || !email || !password) {
-      return res.status(400).json({ message: 'Please add all required fields' });
+    // Enhanced validation
+    if (!username || username.trim() === '') {
+      await pool.query('ROLLBACK');
+      return res.status(400).json({ message: 'Username is required' });
+    }
+    
+    if (!email || !emailRegex.test(email)) {
+      await pool.query('ROLLBACK');
+      return res.status(400).json({ message: 'Please provide a valid email address' });
+    }
+    
+    if (!password) {
+      await pool.query('ROLLBACK');
+      return res.status(400).json({ message: 'Password is required' });
+    }
+    
+    // Check password strength
+    if (password.length < 8) {
+      await pool.query('ROLLBACK');
+      return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+    }
+    
+    // Basic password strength check
+    const hasLetter = /[a-zA-Z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    if (!hasLetter || !hasNumber) {
+      await pool.query('ROLLBACK');
+      return res.status(400).json({ 
+        message: 'Password must contain at least one letter and one number'
+      });
     }
 
     // Check if user exists
@@ -27,7 +63,18 @@ const registerUser = async (req, res) => {
     );
 
     if (existingUsers.length > 0) {
-      return res.status(400).json({ message: 'User already exists' });
+      const existingUser = existingUsers[0];
+      let message = 'User already exists';
+      
+      // Give more specific error messages
+      if (existingUser.email === email) {
+        message = 'Email address is already in use';
+      } else if (existingUser.username === username) {
+        message = 'Username is already taken';
+      }
+      
+      await pool.query('ROLLBACK');
+      return res.status(400).json({ message });
     }
 
     // Hash password
@@ -37,24 +84,36 @@ const registerUser = async (req, res) => {
     // Create user
     const [result] = await pool.query(
       'INSERT INTO users (username, email, password, full_name) VALUES (?, ?, ?, ?)',
-      [username, email, hashedPassword, full_name]
+      [username, email, hashedPassword, full_name || null]
     );
 
-    if (result.affectedRows === 1) {
-      const [rows] = await pool.query(
-        'SELECT user_id, username, email, full_name FROM users WHERE user_id = ?',
-        [result.insertId]
-      );
-
-      res.status(201).json({
-        user: rows[0],
-        token: generateToken(rows[0].user_id),
-      });
-    } else {
-      res.status(400).json({ message: 'Invalid user data' });
+    if (result.affectedRows !== 1) {
+      await pool.query('ROLLBACK');
+      return res.status(400).json({ message: 'Failed to create user' });
     }
+    
+    const [rows] = await pool.query(
+      'SELECT user_id, username, email, full_name FROM users WHERE user_id = ?',
+      [result.insertId]
+    );
+
+    await pool.query('COMMIT');
+    res.status(201).json({
+      user: rows[0],
+      token: generateToken(rows[0].user_id),
+    });
+    
   } catch (error) {
-    console.error(error);
+    await pool.query('ROLLBACK');
+    console.error('Registration error:', error);
+    
+    // Handle unique constraint errors
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ 
+        message: 'Username or email already exists' 
+      });
+    }
+    
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -65,6 +124,10 @@ const registerUser = async (req, res) => {
 const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Please provide email and password' });
+    }
 
     // Check for user email
     const [rows] = await pool.query(
@@ -84,6 +147,8 @@ const loginUser = async (req, res) => {
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
+
+   
 
     res.json({
       user: {
@@ -126,6 +191,8 @@ const getUserProfile = async (req, res) => {
 // @access  Private
 const updateUserProfile = async (req, res) => {
   try {
+    await pool.query('START TRANSACTION');
+    
     const { username, email, full_name, password } = req.body;
 
     // Get user
@@ -135,10 +202,49 @@ const updateUserProfile = async (req, res) => {
     );
 
     if (rows.length === 0) {
+      await pool.query('ROLLBACK');
       return res.status(404).json({ message: 'User not found' });
     }
 
     const user = rows[0];
+
+    // Validate updated email if provided
+    if (email && email !== user.email) {
+      if (!emailRegex.test(email)) {
+        await pool.query('ROLLBACK');
+        return res.status(400).json({ message: 'Please provide a valid email address' });
+      }
+      
+      // Check if email is already in use
+      const [emailCheck] = await pool.query(
+        'SELECT * FROM users WHERE email = ? AND user_id != ?',
+        [email, req.user.user_id]
+      );
+      
+      if (emailCheck.length > 0) {
+        await pool.query('ROLLBACK');
+        return res.status(400).json({ message: 'Email is already in use' });
+      }
+    }
+    
+    // Validate updated username if provided
+    if (username && username !== user.username) {
+      if (username.trim() === '') {
+        await pool.query('ROLLBACK');
+        return res.status(400).json({ message: 'Username cannot be empty' });
+      }
+      
+      // Check if username is already taken
+      const [usernameCheck] = await pool.query(
+        'SELECT * FROM users WHERE username = ? AND user_id != ?',
+        [username, req.user.user_id]
+      );
+      
+      if (usernameCheck.length > 0) {
+        await pool.query('ROLLBACK');
+        return res.status(400).json({ message: 'Username is already taken' });
+      }
+    }
 
     // Update fields
     const updatedUser = {
@@ -148,8 +254,23 @@ const updateUserProfile = async (req, res) => {
       password: user.password,
     };
 
-    // If password is provided, hash it
+    // If password is provided, validate and hash it
     if (password) {
+      // Check password strength
+      if (password.length < 8) {
+        await pool.query('ROLLBACK');
+        return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+      }
+      
+      const hasLetter = /[a-zA-Z]/.test(password);
+      const hasNumber = /\d/.test(password);
+      if (!hasLetter || !hasNumber) {
+        await pool.query('ROLLBACK');
+        return res.status(400).json({ 
+          message: 'Password must contain at least one letter and one number'
+        });
+      }
+      
       const salt = await bcrypt.genSalt(10);
       updatedUser.password = await bcrypt.hash(password, salt);
     }
@@ -158,10 +279,39 @@ const updateUserProfile = async (req, res) => {
     let profileImagePath = user.profile_image;
     if (req.files && req.files.profile_image) {
       const profileImage = req.files.profile_image;
-      const uploadPath = `./uploads/profiles/${req.user.user_id}_${profileImage.name}`;
       
-      await profileImage.mv(uploadPath);
-      profileImagePath = `/uploads/profiles/${req.user.user_id}_${profileImage.name}`;
+      // Validate it's an image
+      const validImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+      if (!validImageTypes.includes(profileImage.mimetype)) {
+        await pool.query('ROLLBACK');
+        return res.status(400).json({ message: 'Profile image must be an image file' });
+      }
+      
+      // Delete old profile image if exists
+      if (user.profile_image) {
+        const oldProfilePath = `./public${user.profile_image}`;
+        if (fs.existsSync(oldProfilePath)) {
+          fs.unlinkSync(oldProfilePath);
+        }
+      }
+      
+      // Generate unique filename
+      const fileName = `${req.user.user_id}_${uuidv4()}${path.extname(profileImage.name)}`;
+      profileImagePath = `/uploads/profiles/${fileName}`;
+      const uploadPath = `./public/uploads/profiles/${fileName}`;
+      
+      // Create directory if it doesn't exist
+      if (!fs.existsSync('./public/uploads/profiles')) {
+        fs.mkdirSync('./public/uploads/profiles', { recursive: true });
+      }
+      
+      try {
+        await profileImage.mv(uploadPath);
+      } catch (error) {
+        await pool.query('ROLLBACK');
+        console.error('Profile image upload error:', error);
+        return res.status(500).json({ message: 'Profile image upload failed' });
+      }
     }
 
     // Update user in database
@@ -170,18 +320,30 @@ const updateUserProfile = async (req, res) => {
       [updatedUser.username, updatedUser.email, updatedUser.full_name, updatedUser.password, profileImagePath, req.user.user_id]
     );
 
-    if (result.affectedRows === 1) {
-      const [updatedRows] = await pool.query(
-        'SELECT user_id, username, email, full_name, profile_image FROM users WHERE user_id = ?',
-        [req.user.user_id]
-      );
-
-      res.json(updatedRows[0]);
-    } else {
-      res.status(400).json({ message: 'Update failed' });
+    if (result.affectedRows !== 1) {
+      await pool.query('ROLLBACK');
+      return res.status(400).json({ message: 'Update failed' });
     }
+    
+    const [updatedRows] = await pool.query(
+      'SELECT user_id, username, email, full_name, profile_image FROM users WHERE user_id = ?',
+      [req.user.user_id]
+    );
+
+    await pool.query('COMMIT');
+    res.json(updatedRows[0]);
+    
   } catch (error) {
+    await pool.query('ROLLBACK');
     console.error(error);
+    
+    // Handle unique constraint errors
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ 
+        message: 'Username or email already exists' 
+      });
+    }
+    
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -191,11 +353,88 @@ const updateUserProfile = async (req, res) => {
 // @access  Public
 const getUsers = async (req, res) => {
   try {
+    // Add pagination
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+    
     const [rows] = await pool.query(
-      'SELECT user_id, username, full_name, profile_image FROM users'
+      'SELECT user_id, username, full_name, profile_image FROM users LIMIT ? OFFSET ?',
+      [limit, offset]
     );
 
-    res.json(rows);
+    const [countResult] = await pool.query('SELECT COUNT(*) as total FROM users');
+    const totalCount = countResult[0].total;
+    const totalPages = Math.ceil(totalCount / limit);
+    
+    res.json({
+      users: rows,
+      pagination: {
+        page,
+        limit,
+        totalItems: totalCount,
+        totalPages
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Get user by ID (public profile)
+// @route   GET /api/users/:id
+// @access  Public
+const getUserById = async (req, res) => {
+  try {
+    const [userRows] = await pool.query(
+      `SELECT user_id, username, full_name, profile_image, created_at
+       FROM users
+       WHERE user_id = ?`,
+      [req.params.id]
+    );
+    
+    if (userRows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Get item count
+    const [itemCountRows] = await pool.query(
+      `SELECT COUNT(*) as item_count
+       FROM items
+       WHERE seller_id = ? AND is_deleted = false`,
+      [req.params.id]
+    );
+    
+    // Get average rating and review count
+    const [ratingRows] = await pool.query(
+      `SELECT ROUND(AVG(r.rating), 1) as avg_seller_rating, COUNT(DISTINCT r.review_id) as review_count
+       FROM items i
+       LEFT JOIN reviews r ON i.item_id = r.item_id
+       WHERE i.seller_id = ?`,
+      [req.params.id]
+    );
+    
+    // Get user's recently listed items
+    const [items] = await pool.query(
+      `SELECT i.*, c.name as category_name
+       FROM items i
+       JOIN categories c ON i.category_id = c.category_id
+       WHERE i.seller_id = ? AND i.is_deleted = false
+       ORDER BY i.created_at DESC
+       LIMIT 5`,
+      [req.params.id]
+    );
+    
+    const userData = {
+      ...userRows[0],
+      item_count: itemCountRows[0].item_count,
+      avg_seller_rating: ratingRows[0].avg_seller_rating || 0,
+      review_count: ratingRows[0].review_count || 0,
+      recent_items: items
+    };
+    
+    res.json(userData);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error' });
@@ -208,4 +447,5 @@ module.exports = {
   getUserProfile,
   updateUserProfile,
   getUsers,
+  getUserById
 };

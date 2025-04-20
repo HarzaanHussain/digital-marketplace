@@ -5,11 +5,13 @@ const {
   createReview,
   getItemReviews,
   updateReview,
-  deleteReview
+  deleteReview,
+  getUserReviews
 } = require('../controllers/reviewController');
 
 router.post('/', protect, createReview);
 router.get('/item/:id', getItemReviews);
+router.get('/user', protect, getUserReviews);
 router.put('/:id', protect, updateReview);
 router.delete('/:id', protect, deleteReview);
 

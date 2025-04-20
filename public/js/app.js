@@ -1,4 +1,3 @@
-// public/js/app.js
 document.addEventListener('DOMContentLoaded', () => {
     // App State
     const state = {
@@ -6,7 +5,8 @@ document.addEventListener('DOMContentLoaded', () => {
         currentItemId: null,
         user: null,
         token: localStorage.getItem('token'),
-        alertCount: 0
+        alertCount: 0,
+        notificationCount: 0
     };
 
     // API Base URL
@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.user = user;
                 updateAuthUI();
                 checkForAlerts();
+                checkForSellerNotifications();
             } catch (error) {
                 console.error('Failed to fetch user profile:', error);
                 logout();
@@ -93,6 +94,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     const alertId = e.target.closest('.alert-card').dataset.id;
                     markAlertAsRead(alertId);
                     break;
+                case 'markAllRead':
+                    markAllAlertsAsRead();
+                    break;
+                case 'markNotificationRead':
+                    const notificationId = e.target.closest('.notification-card').dataset.id;
+                    markNotificationAsRead(notificationId);
+                    break;
                 case 'deleteAlert':
                     const alertToDeleteId = e.target.closest('.alert-card').dataset.id;
                     deleteAlert(alertToDeleteId);
@@ -106,12 +114,40 @@ document.addEventListener('DOMContentLoaded', () => {
                     const downloadItemId = e.target.dataset.id;
                     downloadPurchasedItem(downloadItemId);
                     break;
+                case 'editItem':
+                    const editItemId = e.target.dataset.id;
+                    if (editItemId) {
+                        showPriceEditDialog(editItemId);
+                    } else {
+                        console.error('No item ID found for edit action');
+                    }
+                    break;
+                case 'editReview':
+                    const reviewId = e.target.dataset.id;
+                    const reviewElement = e.target.closest('.review');
+                    editReview(reviewId, reviewElement);
+                    break;
+                case 'cancelEditReview':
+                    const cancelReview = e.target.closest('.review');
+                    cancelEditReview(cancelReview);
+                    break;
+                case 'closePriceEditDialog':
+                    closePriceEditDialog();
+                    break;
+                case 'updatePrice':
+                    submitPriceUpdate();
+                    break;
             }
         }
     }
 
     // Navigate to a page
     function navigateTo(page, params = {}) {
+        // Clear any previous state if needed
+        if (page === 'home' || page === 'browse') {
+            state.currentItemId = null;
+        }
+        
         state.currentPage = page;
         state.params = params;
 
@@ -172,56 +208,61 @@ document.addEventListener('DOMContentLoaded', () => {
 
             case 'item':
                 renderTemplate('item-detail-template', pageContent);
-                loadItem(params.itemId);
+                if (params.itemId) {
+                    loadItem(params.itemId);
 
-                // Set up back button
-                const backButton = document.getElementById('back-button');
-                backButton.addEventListener('click', () => {
-                    navigateTo('browse');
-                });
-
-                // Set up review form
-                const reviewForm = document.getElementById('review-form');
-                if (reviewForm) {
-                    reviewForm.addEventListener('submit', (e) => {
-                        e.preventDefault();
-                        submitReview(params.itemId);
+                    // Set up back button
+                    const backButton = document.getElementById('back-button');
+                    backButton.addEventListener('click', () => {
+                        navigateTo('browse');
                     });
-                }
 
-                // Set up star rating
-                const stars = document.querySelectorAll('.star-rating i');
-                if (stars.length > 0) {
-                    stars.forEach(star => {
-                        star.addEventListener('click', () => {
-                            const rating = star.dataset.rating;
-                            document.getElementById('rating-input').value = rating;
-                            updateStarRating(rating);
+                    // Set up review form
+                    const reviewForm = document.getElementById('review-form');
+                    if (reviewForm) {
+                        reviewForm.addEventListener('submit', (e) => {
+                            e.preventDefault();
+                            submitReview(params.itemId);
                         });
-                    });
+                    }
 
-                    // Set initial star rating
-                    updateStarRating(5);
-                }
+                    // Set up star rating
+                    const stars = document.querySelectorAll('.star-rating i');
+                    if (stars.length > 0) {
+                        stars.forEach(star => {
+                            star.addEventListener('click', () => {
+                                const rating = star.dataset.rating;
+                                document.getElementById('rating-input').value = rating;
+                                updateStarRating(rating);
+                            });
+                        });
 
-                // Set up alert button
-                const setAlertButton = document.getElementById('set-alert-button');
-                if (setAlertButton) {
-                    setAlertButton.addEventListener('click', () => {
-                        openSetAlertModal(params.itemId);
-                    });
-                }
+                        // Set initial star rating
+                        updateStarRating(5);
+                    }
 
-                // Set up purchase button
-                const purchaseButton = document.getElementById('purchase-button');
-                if (purchaseButton) {
-                    purchaseButton.addEventListener('click', () => {
-                        if (purchaseButton.dataset.action === 'editItem') {
-                            editItem(params.itemId);
-                        } else {
-                            purchaseItem(params.itemId);
-                        }
-                    });
+                    // Set up alert button
+                    const setAlertButton = document.getElementById('set-alert-button');
+                    if (setAlertButton) {
+                        setAlertButton.addEventListener('click', () => {
+                            openSetAlertModal(params.itemId);
+                        });
+                    }
+
+                    // Set up purchase button
+                    const purchaseButton = document.getElementById('purchase-button');
+                    if (purchaseButton) {
+                        purchaseButton.addEventListener('click', () => {
+                            if (purchaseButton.dataset.action === 'editItem') {
+                                showPriceEditDialog(params.itemId);
+                            } else {
+                                purchaseItem(params.itemId);
+                            }
+                        });
+                    }
+                } else {
+                    showAlert('Invalid item ID', 'danger');
+                    navigateTo('browse');
                 }
                 break;
 
@@ -289,6 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Load purchases and sales
                 loadPurchases();
                 loadSales();
+                loadSellerNotifications();
                 break;
 
             case 'sell':
@@ -298,13 +340,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 renderTemplate('sell-template', pageContent);
-                loadCategoriesForSell();
-
+                
+                // Load categories
+                await loadCategoriesForSell();
+                
+                // Add submit handler for form
                 const sellForm = document.getElementById('sell-form');
-                sellForm.addEventListener('submit', (e) => {
-                    e.preventDefault();
-                    sellItem();
-                });
+                if (sellForm) {
+                    sellForm.addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        sellItem();
+                    });
+                }
                 break;
 
             case 'alerts':
@@ -322,9 +369,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     openNewAlertModal();
                 });
 
+                // Set up mark all as read button
+                const markAllReadButton = document.getElementById('mark-all-read-button');
+                if (markAllReadButton) {
+                    markAllReadButton.addEventListener('click', () => {
+                        markAllAlertsAsRead();
+                    });
+                }
+
                 // Set up modal close
-                const closeModal = document.querySelector('.close-modal');
-                closeModal.addEventListener('click', () => {
+                const closeModalBtn = document.querySelector('.close-modal');
+                closeModalBtn.addEventListener('click', () => {
                     closeModal();
                 });
 
@@ -361,17 +416,330 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Show/hide elements based on authentication
             updateAuthUI();
+        } else {
+            container.innerHTML = `<div class="error">Template not found: ${templateId}</div>`;
         }
     }
 
-    // Edit an item
-    function editItem(itemId) {
-        // For now, simply navigate to sell page
-        // In a more advanced implementation, you could pre-fill a form with the item's current data
-        navigateTo('sell');
+    // Show price edit dialog
+    function showPriceEditDialog(itemId) {
+        if (!itemId) {
+            showAlert('Invalid item ID', 'danger');
+            return;
+        }
         
-        // Show a message to the user
-        showAlert('To edit your item, please create a new listing and delete the old one', 'info');
+        // Close existing dialog if any
+        closePriceEditDialog();
+        
+        // Get the current item data
+        apiRequest(`/items/${itemId}`, 'GET')
+            .then(item => {
+                // Create the price edit dialog element
+                const dialog = document.createElement('div');
+                dialog.id = 'price-edit-dialog';
+                dialog.className = 'modal';
+                dialog.innerHTML = `
+                    <div class="modal-content">
+                        <span class="close-button" data-action="closePriceEditDialog">&times;</span>
+                        <h3>Edit Price for "${item.title}"</h3>
+                        <div class="form-group">
+                            <label for="edit-price-input">New Price ($)</label>
+                            <input type="number" id="edit-price-input" min="0.01" step="0.01" value="${item.price}" required>
+                        </div>
+                        <input type="hidden" id="edit-item-id" value="${item.item_id}">
+                        <button id="update-price-button" class="btn btn-primary">Update Price</button>
+                    </div>
+                `;
+
+                // Add to the page
+                document.body.appendChild(dialog);
+                
+                // Add direct event listener
+                const updateButton = document.getElementById('update-price-button');
+                updateButton.addEventListener('click', submitPriceUpdate);
+                
+                // Show the dialog
+                dialog.style.display = 'block';
+            })
+            .catch(error => {
+                showAlert('Failed to load item: ' + error.message, 'danger');
+            });
+    }
+
+    // Close price edit dialog
+    function closePriceEditDialog() {
+        const dialog = document.getElementById('price-edit-dialog');
+        if (dialog) {
+            dialog.remove();
+        }
+    }
+
+    // Submit price update
+    function submitPriceUpdate() {
+        const itemIdElement = document.getElementById('edit-item-id');
+        const priceElement = document.getElementById('edit-price-input');
+        
+        if (!itemIdElement || !priceElement) {
+            showAlert('Form elements not found', 'danger');
+            return;
+        }
+        
+        const itemId = itemIdElement.value;
+        const newPrice = priceElement.value;
+        
+        if (!itemId) {
+            showAlert('Item ID not found', 'danger');
+            return;
+        }
+        
+        // Validate price
+        if (!newPrice || parseFloat(newPrice) <= 0) {
+            showAlert('Please enter a valid price greater than 0', 'warning');
+            return;
+        }
+
+        // Create FormData with just the price
+        const formData = new FormData();
+        formData.append('price', newPrice);
+        
+        // Update the item with just the price change
+        apiRequest(`/items/${itemId}`, 'PUT', formData)
+            .then(updatedItem => {
+                showAlert('Price updated successfully!', 'success');
+                
+                // Close the dialog
+                closePriceEditDialog();
+                
+                // Refresh the current page to show updated price
+                if (state.currentPage === 'item' && state.params.itemId == itemId) {
+                    loadItem(itemId);
+                } else if (state.currentPage === 'profile') {
+                    loadSales();
+                }
+            })
+            .catch(error => {
+                showAlert('Failed to update price: ' + error.message, 'danger');
+            });
+    }
+
+    // Load categories for sell form
+    async function loadCategoriesForSell() {
+        const categoryInput = document.getElementById('item-category-input');
+        if (!categoryInput) return;
+    
+        try {
+            const categories = await apiRequest('/categories');
+    
+            // Keep the first option (or create one if it doesn't exist)
+            let firstOption;
+            if (categoryInput.options.length > 0) {
+                firstOption = categoryInput.options[0];
+            } else {
+                firstOption = document.createElement('option');
+                firstOption.value = '';
+                firstOption.textContent = 'Select a category';
+            }
+            
+            categoryInput.innerHTML = '';
+            categoryInput.appendChild(firstOption);
+    
+            // Add all categories
+            categories.forEach(category => {
+                const option = document.createElement('option');
+                option.value = category.category_id;
+                option.textContent = category.name;
+                categoryInput.appendChild(option);
+            });
+            
+            return categories;
+            
+        } catch (error) {
+            showAlert('Failed to load categories. Please try again.', 'danger');
+            console.error('Failed to load categories:', error);
+        }
+    }
+
+    // Sell a new item
+    async function sellItem() {
+        const title = document.getElementById('item-title-input').value.trim();
+        const description = document.getElementById('item-description-input').value.trim();
+        const price = document.getElementById('item-price-input').value;
+        const categoryId = document.getElementById('item-category-input').value;
+        const fileInput = document.getElementById('item-file-input');
+        const thumbnailInput = document.getElementById('item-thumbnail-input');
+        
+        // Validation
+        if (!title) {
+            showAlert('Please enter a title', 'warning');
+            return;
+        }
+        
+        if (!price || parseFloat(price) <= 0) {
+            showAlert('Please enter a valid price greater than 0', 'warning');
+            return;
+        }
+        
+        if (!categoryId) {
+            showAlert('Please select a category', 'warning');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('title', title);
+        formData.append('description', description);
+        formData.append('price', price);
+        formData.append('category_id', categoryId);
+
+        // Only append file if one is selected
+        if (fileInput.files[0]) {
+            formData.append('file', fileInput.files[0]);
+        }
+
+        // Only append thumbnail if one is selected
+        if (thumbnailInput.files[0]) {
+            formData.append('thumbnail', thumbnailInput.files[0]);
+        }
+
+        try {
+            // Use POST method for new items
+            const item = await apiRequest('/items', 'POST', formData);
+            
+            showAlert('Item listed successfully!', 'success');
+
+            // Navigate to item page
+            navigateTo('item', { itemId: item.item_id });
+        } catch (error) {
+            showAlert('Failed to list item: ' + (error.message || 'Unknown error'), 'danger');
+        }
+    }
+
+    // Edit a review
+    function editReview(reviewId, reviewElement) {
+        // Store the original content to restore if canceled
+        if (!reviewElement.dataset.originalRating) {
+            const ratingStars = reviewElement.querySelector('.star-rating').innerHTML;
+            const commentText = reviewElement.querySelector('.review-comment').textContent;
+            reviewElement.dataset.originalRating = ratingStars;
+            reviewElement.dataset.originalComment = commentText;
+            reviewElement.dataset.reviewId = reviewId;
+
+            // Get current rating
+            const activeStars = reviewElement.querySelectorAll('.star-rating .fas.fa-star').length;
+            
+            // Create edit form
+            const editForm = document.createElement('form');
+            editForm.className = 'edit-review-form';
+            editForm.innerHTML = `
+                <div class="rating-select">
+                    <span>Rating: </span>
+                    <div class="star-rating edit-stars">
+                        <i class="${activeStars >= 1 ? 'fas' : 'far'} fa-star" data-rating="1"></i>
+                        <i class="${activeStars >= 2 ? 'fas' : 'far'} fa-star" data-rating="2"></i>
+                        <i class="${activeStars >= 3 ? 'fas' : 'far'} fa-star" data-rating="3"></i>
+                        <i class="${activeStars >= 4 ? 'fas' : 'far'} fa-star" data-rating="4"></i>
+                        <i class="${activeStars >= 5 ? 'fas' : 'far'} fa-star" data-rating="5"></i>
+                    </div>
+                    <input type="hidden" class="edit-rating-input" value="${activeStars}">
+                </div>
+                <div class="form-group">
+                    <textarea class="edit-comment" rows="3">${commentText}</textarea>
+                </div>
+                <div class="edit-actions">
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <button type="button" class="btn btn-secondary" data-action="cancelEditReview">Cancel</button>
+                </div>
+            `;
+            
+            // Replace the review content with the edit form
+            reviewElement.querySelector('.review-comment').style.display = 'none';
+            reviewElement.querySelector('.star-rating').style.display = 'none';
+            reviewElement.appendChild(editForm);
+            
+            // Add star rating functionality
+            const editStars = editForm.querySelectorAll('.edit-stars i');
+            editStars.forEach(star => {
+                star.addEventListener('click', () => {
+                    const rating = star.dataset.rating;
+                    editForm.querySelector('.edit-rating-input').value = rating;
+                    
+                    // Update star display
+                    editStars.forEach(s => {
+                        if (s.dataset.rating <= rating) {
+                            s.classList.remove('far');
+                            s.classList.add('fas');
+                        } else {
+                            s.classList.remove('fas');
+                            s.classList.add('far');
+                        }
+                    });
+                });
+            });
+            
+            // Add submit handler
+            editForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                submitReviewEdit(reviewId, reviewElement);
+            });
+        }
+    }
+
+    // Submit review edit
+    async function submitReviewEdit(reviewId, reviewElement) {
+        const editForm = reviewElement.querySelector('.edit-review-form');
+        const rating = editForm.querySelector('.edit-rating-input').value;
+        const comment = editForm.querySelector('.edit-comment').value;
+        
+        // Validate rating
+        if (!rating || isNaN(parseInt(rating)) || parseInt(rating) < 1 || parseInt(rating) > 5) {
+            showAlert('Please select a valid rating between 1 and 5', 'warning');
+            return;
+        }
+        
+        try {
+            await apiRequest(`/reviews/${reviewId}`, 'PUT', {
+                rating: parseInt(rating),
+                comment
+            });
+            
+            showAlert('Review updated successfully!', 'success');
+            
+            // Update the review display with the new star rating
+            const updatedStarRating = createStarRating(rating);
+            
+            reviewElement.querySelector('.star-rating').innerHTML = updatedStarRating;
+            reviewElement.querySelector('.review-comment').textContent = comment;
+            
+            // Remove form and show original content
+            reviewElement.removeChild(editForm);
+            reviewElement.querySelector('.review-comment').style.display = 'block';
+            reviewElement.querySelector('.star-rating').style.display = 'block';
+            
+            // Clear stored originals
+            delete reviewElement.dataset.originalRating;
+            delete reviewElement.dataset.originalComment;
+            delete reviewElement.dataset.reviewId;
+            
+        } catch (error) {
+            showAlert('Failed to update review: ' + error.message, 'danger');
+        }
+    }
+
+    // Cancel review edit
+    function cancelEditReview(reviewElement) {
+        // Remove the edit form
+        const editForm = reviewElement.querySelector('.edit-review-form');
+        if (editForm) {
+            reviewElement.removeChild(editForm);
+        }
+        
+        // Show original content
+        reviewElement.querySelector('.review-comment').style.display = 'block';
+        reviewElement.querySelector('.star-rating').style.display = 'block';
+        
+        // Clear stored originals
+        delete reviewElement.dataset.originalRating;
+        delete reviewElement.dataset.originalComment;
+        delete reviewElement.dataset.reviewId;
     }
 
     // Confirm delete item dialog
@@ -390,23 +758,23 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // If on item detail page, navigate back to profile
             if (state.currentPage === 'item') {
-                navigateTo('profile');
-                switchTab('sales');
+                navigateTo('home');
+                switchTab('home');
             } else {
                 // If on profile page, just reload sales
                 loadSales();
             }
         } catch (error) {
             showAlert('Failed to delete item: ' + error.message, 'danger');
-            console.error('Failed to delete item:', error);
         }
     }
 
     // Download a purchased item
     async function downloadPurchasedItem(itemId) {
         try {
-            // Get the purchase ID
-            const purchases = await apiRequest('/purchases');
+            // Get the purchase ID from purchases data
+            const purchasesResponse = await apiRequest('/purchases');
+            const purchases = purchasesResponse.purchases || purchasesResponse;
             const purchase = purchases.find(p => p.item_id === parseInt(itemId));
             
             if (!purchase) {
@@ -426,7 +794,55 @@ document.addEventListener('DOMContentLoaded', () => {
             showAlert('Download started!', 'success');
         } catch (error) {
             showAlert('Failed to download item: ' + error.message, 'danger');
-            console.error('Failed to download item:', error);
+        }
+    }
+
+    // Check for seller notifications
+    async function checkForSellerNotifications() {
+        if (!state.user) return;
+
+        try {
+            const notifications = await apiRequest('/purchases/notifications');
+            const unreadCount = notifications.filter(notification => !notification.is_read).length;
+
+            state.notificationCount = unreadCount;
+            updateAuthUI();
+        } catch (error) {
+            console.error('Failed to check for seller notifications:', error);
+        }
+    }
+
+    // Mark notification as read
+    async function markNotificationAsRead(notificationId) {
+        if (!notificationId) return;
+
+        try {
+            await apiRequest(`/purchases/notifications/${notificationId}/read`, 'PUT');
+
+            // Reload notifications
+            loadSellerNotifications();
+            
+            // Update notification count
+            checkForSellerNotifications();
+        } catch (error) {
+            showAlert('Failed to mark notification as read', 'danger');
+        }
+    }
+    
+    // Mark all alerts as read
+    async function markAllAlertsAsRead() {
+        try {
+            await apiRequest('/alerts/read-all', 'PUT');
+            
+            showAlert('All alerts marked as read', 'success');
+            
+            // Reload alerts
+            loadAlerts();
+            
+            // Update alert count
+            checkForAlerts();
+        } catch (error) {
+            showAlert('Failed to mark all alerts as read', 'danger');
         }
     }
 
@@ -435,18 +851,39 @@ document.addEventListener('DOMContentLoaded', () => {
         const isLoggedIn = !!state.user;
 
         // Update navigation
-        document.getElementById('login-link').classList.toggle('hidden', isLoggedIn);
-        document.getElementById('register-link').classList.toggle('hidden', isLoggedIn);
-        document.getElementById('profile-link').classList.toggle('hidden', !isLoggedIn);
-        document.getElementById('logout-link').classList.toggle('hidden', !isLoggedIn);
-        document.getElementById('sell-link').classList.toggle('hidden', !isLoggedIn);
-        document.getElementById('alerts-link').classList.toggle('hidden', !isLoggedIn);
+        const loginLink = document.getElementById('login-link');
+        const registerLink = document.getElementById('register-link');
+        const profileLink = document.getElementById('profile-link');
+        const logoutLink = document.getElementById('logout-link');
+        const sellLink = document.getElementById('sell-link');
+        const alertsLink = document.getElementById('alerts-link');
+        
+        if (loginLink) loginLink.classList.toggle('hidden', isLoggedIn);
+        if (registerLink) registerLink.classList.toggle('hidden', isLoggedIn);
+        if (profileLink) profileLink.classList.toggle('hidden', !isLoggedIn);
+        if (logoutLink) logoutLink.classList.toggle('hidden', !isLoggedIn);
+        if (sellLink) sellLink.classList.toggle('hidden', !isLoggedIn);
+        if (alertsLink) alertsLink.classList.toggle('hidden', !isLoggedIn);
 
         // Update alert badge
         const alertBadge = document.getElementById('alert-badge');
         if (alertBadge) {
             alertBadge.classList.toggle('hidden', state.alertCount === 0);
             alertBadge.textContent = state.alertCount;
+        }
+        
+        // Update notification badge
+        const notificationBadge = document.getElementById('notification-badge');
+        if (notificationBadge) {
+            notificationBadge.classList.toggle('hidden', state.notificationCount === 0);
+            notificationBadge.textContent = state.notificationCount;
+        }
+        
+        // Also update the notification badge in the tab if it exists
+        const notificationBadgeTab = document.getElementById('notification-badge-tab');
+        if (notificationBadgeTab) {
+            notificationBadgeTab.classList.toggle('hidden', state.notificationCount === 0);
+            notificationBadgeTab.textContent = state.notificationCount;
         }
 
         // Update auth-required elements
@@ -458,6 +895,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // API Requests
     // Make an API request
     async function apiRequest(endpoint, method = 'GET', data = null) {
+        // Prevent requests with undefined IDs
+        if (endpoint.includes('/undefined') || endpoint.includes('/null')) {
+            console.warn('Prevented request to invalid endpoint:', endpoint);
+            return Promise.reject(new Error('Invalid ID'));
+        }
+
         const headers = {
             'Content-Type': 'application/json'
         };
@@ -503,7 +946,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error(`API request error for ${endpoint}:`, error);
-            showAlert(error.message || 'Failed to connect to server', 'danger');
             throw error;
         }
     }
@@ -527,8 +969,9 @@ document.addEventListener('DOMContentLoaded', () => {
             showAlert('Login successful!', 'success');
             navigateTo('home');
 
-            // Check for alerts
+            // Check for alerts and notifications
             checkForAlerts();
+            checkForSellerNotifications();
         } catch (error) {
             showAlert('Login failed: ' + error.message, 'danger');
         }
@@ -575,6 +1018,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.removeItem('token');
         state.token = null;
         state.user = null;
+        state.currentItemId = null;
 
         // Update UI and redirect
         updateAuthUI();
@@ -592,7 +1036,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!state.user) return;
 
         try {
-            const alerts = await apiRequest('/alerts');
+            const alertsResponse = await apiRequest('/alerts');
+            const alerts = alertsResponse.alerts || alertsResponse;
             const unreadCount = alerts.filter(alert => !alert.is_read).length;
 
             state.alertCount = unreadCount;
@@ -611,7 +1056,8 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = '<div class="loading">Loading...</div>';
 
         try {
-            const items = await apiRequest('/items?limit=4');
+            const response = await apiRequest('/items?limit=4');
+            const items = response.items || response;
 
             if (items.length === 0) {
                 container.innerHTML = '<p class="no-items">No items available</p>';
@@ -626,7 +1072,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         } catch (error) {
             container.innerHTML = '<p class="error">Failed to load items</p>';
-            console.error('Failed to load featured items:', error);
         }
     }
 
@@ -671,7 +1116,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (container) {
                 container.innerHTML = '<p class="error">Failed to load categories</p>';
             }
-            console.error('Failed to load categories:', error);
         }
     }
 
@@ -726,11 +1170,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (params.category) queryParams.push(`category=${encodeURIComponent(params.category)}`);
         if (params.categoryId) queryParams.push(`category=${encodeURIComponent(params.categoryId)}`);
         if (params.seller) queryParams.push(`seller=${encodeURIComponent(params.seller)}`);
+        
+        // Add pagination
+        const page = params.page || 1;
+        const limit = params.limit || 12;
+        queryParams.push(`page=${page}`);
+        queryParams.push(`limit=${limit}`);
 
         const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
 
         try {
-            const items = await apiRequest(`/items${queryString}`);
+            const response = await apiRequest(`/items${queryString}`);
+            const items = response.items || response;
+            const pagination = response.pagination;
 
             if (items.length === 0) {
                 container.innerHTML = '<p class="no-items">No items found</p>';
@@ -743,10 +1195,53 @@ document.addEventListener('DOMContentLoaded', () => {
                 const itemElement = createItemCard(item);
                 container.appendChild(itemElement);
             });
+            
+            // Add pagination controls if available
+            if (pagination) {
+                const paginationElement = createPagination(pagination, params);
+                container.appendChild(paginationElement);
+            }
         } catch (error) {
             container.innerHTML = '<p class="error">Failed to load items</p>';
-            console.error('Failed to load items:', error);
         }
+    }
+
+    // Create pagination controls
+    function createPagination(pagination, currentParams) {
+        const paginationDiv = document.createElement('div');
+        paginationDiv.className = 'pagination';
+        
+        // Previous page button
+        if (pagination.page > 1) {
+            const prevButton = document.createElement('button');
+            prevButton.className = 'btn btn-secondary';
+            prevButton.innerHTML = '&laquo; Previous';
+            prevButton.addEventListener('click', () => {
+                const newParams = { ...currentParams, page: pagination.page - 1 };
+                loadItems(newParams);
+            });
+            paginationDiv.appendChild(prevButton);
+        }
+        
+        // Page number
+        const pageInfo = document.createElement('span');
+        pageInfo.className = 'page-info';
+        pageInfo.textContent = `Page ${pagination.page} of ${pagination.totalPages}`;
+        paginationDiv.appendChild(pageInfo);
+        
+        // Next page button
+        if (pagination.page < pagination.totalPages) {
+            const nextButton = document.createElement('button');
+            nextButton.className = 'btn btn-secondary';
+            nextButton.innerHTML = 'Next &raquo;';
+            nextButton.addEventListener('click', () => {
+                const newParams = { ...currentParams, page: pagination.page + 1 };
+                loadItems(newParams);
+            });
+            paginationDiv.appendChild(nextButton);
+        }
+        
+        return paginationDiv;
     }
 
     // Create an item card element
@@ -757,7 +1252,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Make entire card clickable
         card.addEventListener('click', () => {
-            console.log('Item card clicked, ID:', item.item_id);
             viewItem(item.item_id);
         });
 
@@ -780,7 +1274,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // View an item
     function viewItem(itemId) {
-        console.log('Navigating to item with ID:', itemId);
+        if (!itemId) {
+            showAlert('Invalid item ID', 'warning');
+            return;
+        }
         navigateTo('item', { itemId });
     }
 
@@ -788,17 +1285,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load item details
     async function loadItem(itemId) {
         if (!itemId) {
-            console.error('No itemId provided to loadItem function');
+            showAlert('Invalid item ID', 'danger');
             return;
         }
 
-        console.log('Loading item data for ID:', itemId);
         state.currentItemId = itemId;
 
         try {
-            console.log('Making API request to /items/' + itemId);
             const item = await apiRequest(`/items/${itemId}`);
-            console.log('Received item data:', item);
 
             // Update item details
             document.getElementById('item-title').textContent = item.title;
@@ -815,31 +1309,73 @@ document.addEventListener('DOMContentLoaded', () => {
             // Load reviews
             loadReviews(item.reviews);
 
-            // Update purchase button
+            // Update purchase button and alert button
             const purchaseButton = document.getElementById('purchase-button');
+            const setAlertButton = document.getElementById('set-alert-button');
             const itemActions = document.querySelector('.item-actions');
 
             if (state.user && state.user.user_id === item.seller_id) {
                 // Item owner view - show edit and delete buttons
-                purchaseButton.textContent = 'Edit Item';
+                purchaseButton.textContent = 'Edit Price';
                 purchaseButton.dataset.action = 'editItem';
+                purchaseButton.dataset.id = item.item_id;
+                
+                // Remove any existing delete buttons first
+                const existingDeleteBtn = itemActions.querySelector('.btn-danger');
+                if (existingDeleteBtn) {
+                    existingDeleteBtn.remove();
+                }
                 
                 // Create delete button
                 const deleteButton = document.createElement('button');
                 deleteButton.className = 'btn btn-danger';
                 deleteButton.textContent = 'Delete Item';
-                deleteButton.addEventListener('click', () => confirmDeleteItem(item.item_id, item.title));
+                deleteButton.dataset.id = item.item_id;
+                deleteButton.dataset.action = 'deleteItem';
                 
-                // Add to actions container
+                // Hide alert button for owner
+                if (setAlertButton) {
+                    setAlertButton.classList.add('hidden');
+                }
+                
+                // Add delete button to actions container
                 itemActions.appendChild(deleteButton);
             } else {
                 // Non-owner view - show purchase button
                 purchaseButton.textContent = 'Purchase';
                 purchaseButton.dataset.action = 'purchaseItem';
+                
+                // Check if user has already purchased this item
+                if (state.user) {
+                    try {
+                        const purchasesResponse = await apiRequest('/purchases');
+                        const purchases = purchasesResponse.purchases || purchasesResponse;
+                        const alreadyPurchased = purchases.some(p => p.item_id === parseInt(itemId));
+                        
+                        if (alreadyPurchased) {
+                            // Already purchased - show download button instead
+                            purchaseButton.textContent = 'Download';
+                            purchaseButton.dataset.action = 'downloadItem';
+                            purchaseButton.dataset.id = itemId;
+                            
+                            // Hide alert button for buyers who already purchased
+                            if (setAlertButton) {
+                                setAlertButton.classList.add('hidden');
+                            }
+                            
+                            // Show review form
+                            const reviewForm = document.querySelector('.add-review');
+                            if (reviewForm) {
+                                reviewForm.classList.remove('hidden');
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error checking purchase status:', error);
+                    }
+                }
             }
         } catch (error) {
             showAlert('Failed to load item details: ' + error.message, 'danger');
-            console.error('Failed to load item:', error);
         }
     }
 
@@ -867,16 +1403,28 @@ document.addEventListener('DOMContentLoaded', () => {
         reviewElement.className = 'review';
 
         const date = new Date(review.created_at).toLocaleDateString();
+        
+        // Check if this is the current user's review
+        const isUserReview = state.user && review.reviewer_id === state.user.user_id;
+        
+        // Add edit buttons for user's own reviews
+        const editButton = isUserReview ? 
+            `<div class="review-actions">
+                <button class="btn btn-secondary btn-sm" data-action="editReview" data-id="${review.review_id}">
+                    <i class="fas fa-edit"></i> Edit
+                </button>
+            </div>` : '';
 
         reviewElement.innerHTML = `
             <div class="review-header">
                 <span class="reviewer">${review.reviewer_name}</span>
                 <span class="review-date">${date}</span>
+                ${editButton}
             </div>
             <div class="star-rating">
                 ${createStarRating(review.rating)}
             </div>
-            <div class="review-comment">${review.comment}</div>
+            <div class="review-comment">${review.comment || ''}</div>
         `;
 
         return reviewElement;
@@ -884,6 +1432,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Create star rating HTML
     function createStarRating(rating) {
+        rating = parseInt(rating);
         let stars = '';
         for (let i = 1; i <= 5; i++) {
             if (i <= rating) {
@@ -931,7 +1480,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             await apiRequest(`/reviews`, 'POST', {
                 item_id: itemId,
-                rating,
+                rating: parseInt(rating),
                 comment
             });
 
@@ -944,8 +1493,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('review-comment').value = '';
             updateStarRating(5);
         } catch (error) {
-            showAlert('Failed to submit review', 'danger');
-            console.error('Failed to submit review:', error);
+            showAlert('Failed to submit review: ' + error.message, 'danger');
         }
     }
 
@@ -966,28 +1514,76 @@ document.addEventListener('DOMContentLoaded', () => {
             switchTab('purchases');
         } catch (error) {
             showAlert('Failed to purchase item: ' + error.message, 'danger');
-            console.error('Failed to purchase item:', error);
         }
     }
 
     // Open set alert modal for an item
     function openSetAlertModal(itemId) {
-        // Navigate to alerts page and open modal
-        navigateTo('alerts');
-
-        // Wait for page to load and then open modal
-        setTimeout(() => {
-            openNewAlertModal();
-
-            // Pre-select item
-            const alertItemInput = document.getElementById('alert-item-input');
-            if (alertItemInput) {
-                alertItemInput.value = itemId;
-            }
-
-            // Show price threshold field
-            document.getElementById('alert-price-group').classList.remove('hidden');
-        }, 500);
+        // First check if the user has already purchased this item
+        if (state.user) {
+            apiRequest('/purchases')
+                .then(response => {
+                    const purchases = response.purchases || response;
+                    const alreadyPurchased = purchases.some(p => p.item_id === parseInt(itemId));
+                    
+                    if (alreadyPurchased) {
+                        showAlert('You have already purchased this item, no need for alerts', 'info');
+                        return;
+                    }
+                    
+                    // Continue with opening the alert modal if not purchased
+                    navigateTo('alerts');
+                    
+                    // Wait for page to load and then open modal
+                    setTimeout(() => {
+                        openNewAlertModal();
+                        
+                        // Pre-select item
+                        const alertItemInput = document.getElementById('alert-item-input');
+                        if (alertItemInput) {
+                            alertItemInput.value = itemId;
+                        }
+                        
+                        // Set alert type to Price Drop by default
+                        const alertTypeInput = document.getElementById('alert-type-input');
+                        if (alertTypeInput && alertTypeInput.options.length > 0) {
+                            const priceDropOption = Array.from(alertTypeInput.options).find(opt => 
+                                opt.textContent === 'Price Drop'
+                            );
+                            
+                            if (priceDropOption) {
+                                alertTypeInput.value = priceDropOption.value;
+                                // Trigger change event to update form
+                                const event = new Event('change');
+                                alertTypeInput.dispatchEvent(event);
+                            }
+                        }
+                    }, 500);
+                })
+                .catch(error => {
+                    console.error('Error checking purchase status:', error);
+                    
+                    // Fall back to opening the modal anyway
+                    navigateTo('alerts');
+                    setTimeout(() => {
+                        openNewAlertModal();
+                        const alertItemInput = document.getElementById('alert-item-input');
+                        if (alertItemInput) {
+                            alertItemInput.value = itemId;
+                        }
+                    }, 500);
+                });
+        } else {
+            // Just open the modal if not logged in (auth will be checked by the alerts page)
+            navigateTo('alerts');
+            setTimeout(() => {
+                openNewAlertModal();
+                const alertItemInput = document.getElementById('alert-item-input');
+                if (alertItemInput) {
+                    alertItemInput.value = itemId;
+                }
+            }, 500);
+        }
     }
 
     // Profile Page Functions
@@ -1001,14 +1597,13 @@ document.addEventListener('DOMContentLoaded', () => {
             // Update profile form
             document.getElementById('profile-username').value = profile.username;
             document.getElementById('profile-email').value = profile.email;
-            document.getElementById('profile-full-name').value = profile.full_name;
+            document.getElementById('profile-full-name').value = profile.full_name || '';
 
             // Update profile image
             const profileImage = document.getElementById('profile-image');
             profileImage.src = profile.profile_image || '/img/default-profile.png';
         } catch (error) {
             showAlert('Failed to load profile', 'danger');
-            console.error('Failed to load profile:', error);
         }
     }
 
@@ -1044,8 +1639,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Clear password field
             document.getElementById('profile-password').value = '';
         } catch (error) {
-            showAlert('Failed to update profile', 'danger');
-            console.error('Failed to update profile:', error);
+            showAlert('Failed to update profile: ' + error.message, 'danger');
         }
     }
 
@@ -1068,8 +1662,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             showAlert('Profile image updated successfully!', 'success');
         } catch (error) {
-            showAlert('Failed to update profile image', 'danger');
-            console.error('Failed to update profile image:', error);
+            showAlert('Failed to update profile image: ' + error.message, 'danger');
         }
     }
 
@@ -1094,7 +1687,8 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = '<div class="loading">Loading...</div>';
 
         try {
-            const purchases = await apiRequest('/purchases');
+            const response = await apiRequest('/purchases');
+            const purchases = response.purchases || response;
 
             if (purchases.length === 0) {
                 container.innerHTML = '<p class="no-items">No purchases yet</p>';
@@ -1109,16 +1703,81 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         } catch (error) {
             container.innerHTML = '<p class="error">Failed to load purchases</p>';
-            console.error('Failed to load purchases:', error);
         }
+    }
+
+    // Load seller notifications
+    async function loadSellerNotifications() {
+        const container = document.getElementById('notifications-container');
+        if (!container) return;
+
+        container.innerHTML = '<div class="loading">Loading...</div>';
+
+        try {
+            const notifications = await apiRequest('/purchases/notifications');
+
+            if (notifications.length === 0) {
+                container.innerHTML = '<p class="no-items">No notifications yet</p>';
+                return;
+            }
+
+            container.innerHTML = '';
+
+            notifications.forEach(notification => {
+                const notificationElement = createNotificationElement(notification);
+                container.appendChild(notificationElement);
+            });
+            
+            // Update notification count
+            state.notificationCount = notifications.filter(notification => !notification.is_read).length;
+            updateAuthUI();
+        } catch (error) {
+            container.innerHTML = '<p class="error">Failed to load notifications</p>';
+        }
+    }
+
+    // Create notification element
+    function createNotificationElement(notification) {
+        const element = document.createElement('div');
+        element.className = 'notification-card';
+        
+        if (!notification.is_read) {
+            element.classList.add('unread');
+        }
+        
+        element.dataset.id = notification.notification_id;
+        
+        const date = new Date(notification.created_at).toLocaleDateString();
+        
+        element.innerHTML = `
+            <div class="notification-content">
+                <div class="notification-title">Item Sold: ${notification.item_title}</div>
+                <div class="notification-info">Purchased by ${notification.buyer_name} for $${parseFloat(notification.purchase_price).toFixed(2)}</div>
+                <div class="notification-date">${date}</div>
+            </div>
+            <div class="notification-actions">
+                ${!notification.is_read ? `<button class="btn btn-secondary" data-action="markNotificationRead">Mark as Read</button>` : ''}
+            </div>
+        `;
+        
+        return element;
     }
 
     // Create purchase element
     function createPurchaseElement(purchase) {
         const element = document.createElement('div');
         element.className = 'purchase-card';
+        
+        // Add class for deleted items
+        if (purchase.is_deleted) {
+            element.classList.add('item-deleted');
+        }
 
         const date = new Date(purchase.purchase_date).toLocaleDateString();
+        
+        // Add message for deleted items
+        const deletedNotice = purchase.is_deleted ? 
+            '<div class="deleted-notice">(Item no longer listed)</div>' : '';
 
         element.innerHTML = `
             <div class="purchase-image">
@@ -1126,6 +1785,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <div class="purchase-details">
                 <div class="purchase-title">${purchase.title}</div>
+                ${deletedNotice}
                 <div class="purchase-price">$${parseFloat(purchase.purchase_price).toFixed(2)}</div>
                 <div class="purchase-date">Purchased on ${date}</div>
             </div>
@@ -1135,13 +1795,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 </button>
             </div>
         `;
-
-        // Add download click handler
-        const downloadBtn = element.querySelector('[data-action="downloadItem"]');
-        downloadBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            downloadPurchasedItem(purchase.item_id);
-        });
 
         return element;
     }
@@ -1154,7 +1807,8 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = '<div class="loading">Loading...</div>';
 
         try {
-            const sales = await apiRequest('/items?seller=' + state.user.user_id);
+            const salesResponse = await apiRequest('/items?seller=' + state.user.user_id);
+            const sales = salesResponse.items || salesResponse;
 
             if (sales.length === 0) {
                 container.innerHTML = '<p class="no-items">No sales yet</p>';
@@ -1169,7 +1823,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         } catch (error) {
             container.innerHTML = '<p class="error">Failed to load sales</p>';
-            console.error('Failed to load sales:', error);
         }
     }
 
@@ -1177,6 +1830,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function createSaleElement(sale) {
         const element = document.createElement('div');
         element.className = 'sale-card';
+        
+        // Add class for deleted items
+        if (sale.is_deleted) {
+            element.classList.add('item-deleted');
+        }
 
         element.innerHTML = `
             <div class="sale-image">
@@ -1186,110 +1844,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="sale-title">${sale.title}</div>
                 <div class="sale-price">$${parseFloat(sale.price).toFixed(2)}</div>
                 <div class="sale-date">Listed on ${new Date(sale.created_at).toLocaleDateString()}</div>
+                ${sale.is_deleted ? '<div class="deleted-notice">(No longer listed)</div>' : ''}
             </div>
             <div class="sale-actions">
-                <button class="btn btn-secondary" data-action="editItem" data-id="${sale.item_id}">
-                    <i class="fas fa-edit"></i> Edit
-                </button>
+                ${!sale.is_deleted ? `
+                    <button class="btn btn-secondary" data-action="editItem" data-id="${sale.item_id}">
+                        <i class="fas fa-edit"></i> Edit Price
+                    </button>
+                ` : ''}
                 <button class="btn btn-danger" data-action="deleteItem" data-id="${sale.item_id}">
                     <i class="fas fa-trash"></i> Delete
                 </button>
             </div>
         `;
 
-        // Add event listeners
-        const deleteBtn = element.querySelector('[data-action="deleteItem"]');
-        deleteBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Prevent card click
-            confirmDeleteItem(sale.item_id, sale.title);
-        });
-
-        const editBtn = element.querySelector('[data-action="editItem"]');
-        editBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Prevent card click
-            editItem(sale.item_id);
-        });
-
         return element;
-    }
-
-    // Sell Page Functions
-    // Load categories for sell form
-    async function loadCategoriesForSell() {
-        const categoryInput = document.getElementById('item-category-input');
-        if (!categoryInput) return;
-
-        try {
-            const categories = await apiRequest('/categories');
-
-            // Keep the first option
-            const firstOption = categoryInput.options[0];
-            categoryInput.innerHTML = '';
-            categoryInput.appendChild(firstOption);
-
-            categories.forEach(category => {
-                const option = document.createElement('option');
-                option.value = category.category_id;
-                option.textContent = category.name;
-                categoryInput.appendChild(option);
-            });
-        } catch (error) {
-            console.error('Failed to load categories:', error);
-        }
-    }
-
-    // Sell an item
-    async function sellItem() {
-        const title = document.getElementById('item-title-input').value.trim();
-        const description = document.getElementById('item-description-input').value.trim();
-        const price = document.getElementById('item-price-input').value;
-        const categoryId = document.getElementById('item-category-input').value;
-        const fileInput = document.getElementById('item-file-input');
-        const thumbnailInput = document.getElementById('item-thumbnail-input');
-        
-        // Validation
-        if (!title) {
-            showAlert('Please enter a title', 'warning');
-            return;
-        }
-        
-        if (!price || parseFloat(price) <= 0) {
-            showAlert('Please enter a valid price greater than 0', 'warning');
-            return;
-        }
-        
-        if (!categoryId) {
-            showAlert('Please select a category', 'warning');
-            return;
-        }
-
-        const formData = new FormData();
-        formData.append('title', title);
-        formData.append('description', description);
-        formData.append('price', price);
-        formData.append('category_id', categoryId);
-
-        // Only append file if one is selected
-        if (fileInput.files[0]) {
-            formData.append('file', fileInput.files[0]);
-        }
-
-        // Only append thumbnail if one is selected
-        if (thumbnailInput.files[0]) {
-            formData.append('thumbnail', thumbnailInput.files[0]);
-        }
-
-        try {
-            const item = await apiRequest('/items', 'POST', formData);
-
-            showAlert('Item listed successfully!', 'success');
-
-            // Navigate to item page
-            navigateTo('item', { itemId: item.item_id });
-        } catch (error) {
-            showAlert('Failed to list item: ' + (error.message || 'Unknown error'), 'danger');
-            console.error('Failed to list item:', error);
-        }
     }
 
     // Alerts Page Functions
@@ -1301,7 +1870,8 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = '<div class="loading">Loading...</div>';
 
         try {
-            const alerts = await apiRequest('/alerts');
+            const alertsResponse = await apiRequest('/alerts');
+            const alerts = alertsResponse.alerts || alertsResponse;
 
             if (alerts.length === 0) {
                 container.innerHTML = '<p class="no-alerts">No alerts set</p>';
@@ -1320,7 +1890,6 @@ document.addEventListener('DOMContentLoaded', () => {
             updateAuthUI();
         } catch (error) {
             container.innerHTML = '<p class="error">Failed to load alerts</p>';
-            console.error('Failed to load alerts:', error);
         }
     }
 
@@ -1340,6 +1909,9 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'Price Drop':
                 alertTitle = 'Price Drop Alert';
                 alertInfo = `Price dropped for ${alert.item_title || 'an item'}`;
+                if (alert.price_threshold) {
+                    alertInfo += ` (threshold: $${parseFloat(alert.price_threshold).toFixed(2)})`;
+                }
                 break;
             case 'New Item':
                 alertTitle = 'New Item Alert';
@@ -1384,7 +1956,6 @@ document.addEventListener('DOMContentLoaded', () => {
             loadAlerts();
         } catch (error) {
             showAlert('Failed to mark alert as read', 'danger');
-            console.error('Failed to mark alert as read:', error);
         }
     }
 
@@ -1399,47 +1970,58 @@ document.addEventListener('DOMContentLoaded', () => {
             loadAlerts();
         } catch (error) {
             showAlert('Failed to delete alert', 'danger');
-            console.error('Failed to delete alert:', error);
         }
     }
 
     // Open new alert modal
     function openNewAlertModal() {
         const modal = document.getElementById('new-alert-modal');
-        modal.classList.remove('hidden');
+        if (modal) {
+            modal.classList.remove('hidden');
+        }
     }
 
     // Close modal
     function closeModal() {
         const modal = document.getElementById('new-alert-modal');
-        modal.classList.add('hidden');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
     }
 
     // Update alert form based on selected alert type
     function updateAlertForm() {
-        const alertType = document.getElementById('alert-type-input').value;
-        const alertTypeText = document.getElementById('alert-type-input').options[document.getElementById('alert-type-input').selectedIndex].text;
+        const alertTypeInput = document.getElementById('alert-type-input');
+        if (!alertTypeInput) return;
+        
+        const alertType = alertTypeInput.value;
+        const selectedIndex = alertTypeInput.selectedIndex;
+        if (selectedIndex === -1) return;
+        
+        const alertTypeText = alertTypeInput.options[selectedIndex].text;
 
         // Show/hide fields based on alert type
-        document.getElementById('alert-item-group').classList.add('hidden');
-        document.getElementById('alert-category-group').classList.add('hidden');
-        document.getElementById('alert-price-group').classList.add('hidden');
+        const itemGroup = document.getElementById('alert-item-group');
+        const categoryGroup = document.getElementById('alert-category-group');
+        const priceGroup = document.getElementById('alert-price-group');
+        
+        if (itemGroup) itemGroup.classList.add('hidden');
+        if (categoryGroup) categoryGroup.classList.add('hidden');
+        if (priceGroup) priceGroup.classList.add('hidden');
 
         if (!alertType) return;
 
         switch (alertTypeText) {
             case 'Price Drop':
-                document.getElementById('alert-item-group').classList.remove('hidden');
-                document.getElementById('alert-price-group').classList.remove('hidden');
+                if (itemGroup) itemGroup.classList.remove('hidden');
+                if (priceGroup) priceGroup.classList.remove('hidden');
                 break;
             case 'New Item':
-                document.getElementById('alert-category-group').classList.remove('hidden');
+                if (categoryGroup) categoryGroup.classList.remove('hidden');
                 break;
             case 'Back in Stock':
-                document.getElementById('alert-item-group').classList.remove('hidden');
-                break;
             case 'Seller Update':
-                document.getElementById('alert-item-group').classList.remove('hidden');
+                if (itemGroup) itemGroup.classList.remove('hidden');
                 break;
         }
     }
@@ -1498,14 +2080,42 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!itemInput) return;
 
         try {
-            const items = await apiRequest('/items');
+            const response = await apiRequest('/items');
+            const items = response.items || response;
 
             // Keep the first option
             const firstOption = itemInput.options[0];
             itemInput.innerHTML = '';
             itemInput.appendChild(firstOption);
 
-            items.forEach(item => {
+            // If user is logged in, filter out items they've already purchased
+            let purchasedItemIds = [];
+            if (state.user) {
+                try {
+                    const purchasesResponse = await apiRequest('/purchases');
+                    const purchases = purchasesResponse.purchases || purchasesResponse;
+                    purchasedItemIds = purchases.map(p => p.item_id);
+                } catch (error) {
+                    console.error('Error fetching purchases:', error);
+                }
+            }
+
+            // Filter out items the user already owns or has purchased
+            const filteredItems = items.filter(item => {
+                // Skip user's own items
+                if (state.user && item.seller_id === state.user.user_id) {
+                    return false;
+                }
+                
+                // Skip purchased items
+                if (purchasedItemIds.includes(item.item_id)) {
+                    return false;
+                }
+                
+                return true;
+            });
+
+            filteredItems.forEach(item => {
                 const option = document.createElement('option');
                 option.value = item.item_id;
                 option.textContent = item.title;
@@ -1514,7 +2124,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // If current item is set, select it
             if (state.currentItemId) {
-                itemInput.value = state.currentItemId;
+                // Only select if it's in the options (not purchased)
+                const exists = Array.from(itemInput.options).some(opt => 
+                    opt.value === state.currentItemId.toString()
+                );
+                
+                if (exists) {
+                    itemInput.value = state.currentItemId;
+                }
             }
         } catch (error) {
             console.error('Failed to load items:', error);
@@ -1523,10 +2140,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Create a new alert
     async function createAlert() {
-        const alertTypeId = document.getElementById('alert-type-input').value;
-        const itemId = document.getElementById('alert-item-input').value;
-        const categoryId = document.getElementById('alert-category-input').value;
-        const priceThreshold = document.getElementById('alert-price-input').value;
+        const alertTypeInput = document.getElementById('alert-type-input');
+        const itemInput = document.getElementById('alert-item-input');
+        const categoryInput = document.getElementById('alert-category-input');
+        const priceInput = document.getElementById('alert-price-input');
+        
+        if (!alertTypeInput) return;
+        
+        const alertTypeId = alertTypeInput.value;
+        const itemId = itemInput ? itemInput.value : null;
+        const categoryId = categoryInput ? categoryInput.value : null;
+        const priceThreshold = priceInput ? priceInput.value : null;
 
         if (!alertTypeId) {
             showAlert('Please select an alert type', 'warning');
@@ -1534,12 +2158,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Check required fields based on alert type
-        const alertTypeText = document.getElementById('alert-type-input').options[document.getElementById('alert-type-input').selectedIndex].text;
+        const selectedIndex = alertTypeInput.selectedIndex;
+        if (selectedIndex === -1) {
+            showAlert('Please select a valid alert type', 'warning');
+            return;
+        }
+        
+        const alertTypeText = alertTypeInput.options[selectedIndex].text;
 
         switch (alertTypeText) {
             case 'Price Drop':
                 if (!itemId) {
                     showAlert('Please select an item', 'warning');
+                    return;
+                }
+                
+                if (!priceThreshold || parseFloat(priceThreshold) <= 0) {
+                    showAlert('Please enter a valid price threshold', 'warning');
                     return;
                 }
                 break;
@@ -1559,6 +2194,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
+            // For price drop alerts, check if threshold is below current price
+            if (alertTypeText === 'Price Drop' && itemId) {
+                try {
+                    const item = await apiRequest(`/items/${itemId}`);
+                    const currentPrice = parseFloat(item.price);
+                    const threshold = parseFloat(priceThreshold);
+                    
+                    if (threshold >= currentPrice) {
+                        showAlert(`Price threshold must be below the current price ($${currentPrice.toFixed(2)})`, 'warning');
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Error checking item price:', error);
+                    // Continue anyway
+                }
+            }
+            
             await apiRequest('/alerts', 'POST', {
                 alert_type_id: alertTypeId,
                 item_id: itemId || null,
@@ -1572,15 +2224,56 @@ document.addEventListener('DOMContentLoaded', () => {
             closeModal();
             loadAlerts();
         } catch (error) {
-            showAlert('Failed to create alert', 'danger');
-            console.error('Failed to create alert:', error);
+            showAlert('Failed to create alert: ' + error.message, 'danger');
         }
     }
+
+    // Add CSS for price edit dialog
+    const style = document.createElement('style');
+    style.textContent = `
+        #price-edit-dialog {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        
+        #price-edit-dialog .modal-content {
+            background-color: #fff;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 5px;
+            max-width: 400px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        #price-edit-dialog h3 {
+            margin-top: 0;
+        }
+        
+        #price-edit-dialog .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        #price-edit-dialog .close-button:hover {
+            color: #333;
+        }
+    `;
+    document.head.appendChild(style);
 
     // Utility Functions
     // Show alert message
     function showAlert(message, type = 'info') {
         const alertContainer = document.getElementById('alert-container');
+        if (!alertContainer) return;
 
         const alert = document.createElement('div');
         alert.className = `alert alert-${type}`;

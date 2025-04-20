@@ -7,26 +7,31 @@ const fs = require('fs');
 // @access  Private
 const createPurchase = async (req, res) => {
   try {
+    await pool.query('START TRANSACTION');
+    
     const { item_id } = req.body;
     
     if (!item_id) {
+      await pool.query('ROLLBACK');
       return res.status(400).json({ message: 'Please provide an item ID' });
     }
     
-    // Get item details
+    // Get item details - make sure it's not deleted
     const [itemRows] = await pool.query(
-      'SELECT * FROM items WHERE item_id = ?',
+      'SELECT * FROM items WHERE item_id = ? AND is_deleted = false',
       [item_id]
     );
     
     if (itemRows.length === 0) {
-      return res.status(404).json({ message: 'Item not found' });
+      await pool.query('ROLLBACK');
+      return res.status(404).json({ message: 'Item not found or no longer available' });
     }
     
     const item = itemRows[0];
     
     // Check if user is trying to buy their own item
     if (item.seller_id === req.user.user_id) {
+      await pool.query('ROLLBACK');
       return res.status(400).json({ message: 'You cannot purchase your own item' });
     }
     
@@ -37,6 +42,7 @@ const createPurchase = async (req, res) => {
     );
     
     if (existingPurchases.length > 0) {
+      await pool.query('ROLLBACK');
       return res.status(400).json({ message: 'You have already purchased this item' });
     }
     
@@ -46,17 +52,55 @@ const createPurchase = async (req, res) => {
       [req.user.user_id, item_id, item.price]
     );
     
-    if (result.affectedRows === 1) {
-      const [rows] = await pool.query(
-        'SELECT * FROM purchases WHERE purchase_id = ?',
-        [result.insertId]
-      );
-      
-      res.status(201).json(rows[0]);
-    } else {
-      res.status(400).json({ message: 'Failed to create purchase' });
+    if (result.affectedRows !== 1) {
+      await pool.query('ROLLBACK');
+      return res.status(400).json({ message: 'Failed to create purchase' });
     }
+    
+    // Create notification for seller
+    try {
+      // Check if seller_notifications table exists first
+      const [tableCheck] = await pool.query(`
+        SELECT COUNT(*) as table_exists
+        FROM information_schema.tables
+        WHERE table_schema = DATABASE()
+        AND table_name = 'seller_notifications'
+      `);
+      
+      if (tableCheck[0].table_exists > 0) {
+        await pool.query(
+          'INSERT INTO seller_notifications (seller_id, item_id, buyer_id, purchase_id) VALUES (?, ?, ?, ?)',
+          [item.seller_id, item_id, req.user.user_id, result.insertId]
+        );
+      }
+    } catch (notificationError) {
+      // Log but don't fail the purchase if notification can't be created
+      console.error('Failed to create seller notification:', notificationError);
+    }
+    
+    // Delete any price drop alerts for this user and item
+    try {
+      await pool.query(
+        `DELETE FROM user_alerts 
+         WHERE user_id = ? AND item_id = ? AND alert_type_id IN 
+           (SELECT alert_type_id FROM alert_types WHERE name = 'Price Drop')`,
+        [req.user.user_id, item_id]
+      );
+    } catch (alertError) {
+      // Log but don't fail the purchase if alert deletion fails
+      console.error('Failed to delete price drop alerts:', alertError);
+    }
+    
+    const [rows] = await pool.query(
+      'SELECT * FROM purchases WHERE purchase_id = ?',
+      [result.insertId]
+    );
+    
+    await pool.query('COMMIT');
+    res.status(201).json(rows[0]);
+    
   } catch (error) {
+    await pool.query('ROLLBACK');
     console.error(error);
     res.status(500).json({ message: 'Server error' });
   }
@@ -67,17 +111,41 @@ const createPurchase = async (req, res) => {
 // @access  Private
 const getUserPurchases = async (req, res) => {
   try {
+    // Add pagination
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+    
     const [rows] = await pool.query(
-      `SELECT p.*, i.title, i.description, i.file_path, i.thumbnail_path, u.username as seller_name
+      `SELECT p.*, i.title, i.description, i.file_path, i.thumbnail_path, u.username as seller_name,
+              i.is_deleted
        FROM purchases p
        JOIN items i ON p.item_id = i.item_id
        JOIN users u ON i.seller_id = u.user_id
        WHERE p.buyer_id = ?
-       ORDER BY p.purchase_date DESC`,
+       ORDER BY p.purchase_date DESC
+       LIMIT ? OFFSET ?`,
+      [req.user.user_id, limit, offset]
+    );
+    
+    // FIXED: Get total count with a separate query
+    const [countResult] = await pool.query(
+      'SELECT COUNT(*) as total FROM purchases WHERE buyer_id = ?',
       [req.user.user_id]
     );
     
-    res.json(rows);
+    const totalCount = countResult[0].total;
+    const totalPages = Math.ceil(totalCount / limit);
+    
+    res.json({
+      purchases: rows,
+      pagination: {
+        page,
+        limit,
+        totalItems: totalCount,
+        totalPages
+      }
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error' });
@@ -89,17 +157,43 @@ const getUserPurchases = async (req, res) => {
 // @access  Private
 const getUserSales = async (req, res) => {
   try {
+    // Add pagination
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+    
     const [rows] = await pool.query(
-      `SELECT p.*, i.title, i.description, u.username as buyer_name
+      `SELECT p.*, i.title, i.description, u.username as buyer_name, i.is_deleted
        FROM purchases p
        JOIN items i ON p.item_id = i.item_id
        JOIN users u ON p.buyer_id = u.user_id
        WHERE i.seller_id = ?
-       ORDER BY p.purchase_date DESC`,
+       ORDER BY p.purchase_date DESC
+       LIMIT ? OFFSET ?`,
+      [req.user.user_id, limit, offset]
+    );
+    
+    // FIXED: Get total count with a separate query
+    const [countResult] = await pool.query(
+      `SELECT COUNT(*) as total 
+       FROM purchases p
+       JOIN items i ON p.item_id = i.item_id
+       WHERE i.seller_id = ?`,
       [req.user.user_id]
     );
     
-    res.json(rows);
+    const totalCount = countResult[0].total;
+    const totalPages = Math.ceil(totalCount / limit);
+    
+    res.json({
+      sales: rows,
+      pagination: {
+        page,
+        limit,
+        totalItems: totalCount,
+        totalPages
+      }
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error' });
@@ -145,9 +239,97 @@ const downloadPurchasedItem = async (req, res) => {
   }
 };
 
+// @desc    Get seller notifications
+// @route   GET /api/purchases/notifications
+// @access  Private
+const getSellerNotifications = async (req, res) => {
+  try {
+    // Check if the seller_notifications table exists first
+    const [tableCheck] = await pool.query(`
+      SELECT COUNT(*) as table_exists
+      FROM information_schema.tables
+      WHERE table_schema = DATABASE()
+      AND table_name = 'seller_notifications'
+    `);
+    
+    if (tableCheck[0].table_exists === 0) {
+      return res.json([]);  // Return empty array if table doesn't exist
+    }
+    
+    const [rows] = await pool.query(
+      `SELECT sn.*, i.title as item_title, u.username as buyer_name, p.purchase_price
+       FROM seller_notifications sn
+       JOIN items i ON sn.item_id = i.item_id
+       JOIN users u ON sn.buyer_id = u.user_id
+       JOIN purchases p ON sn.purchase_id = p.purchase_id
+       WHERE sn.seller_id = ?
+       ORDER BY sn.created_at DESC`,
+      [req.user.user_id]
+    );
+    
+    res.json(rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Mark seller notification as read
+// @route   PUT /api/purchases/notifications/:id/read
+// @access  Private
+const markNotificationAsRead = async (req, res) => {
+  try {
+    // Check if the seller_notifications table exists first
+    const [tableCheck] = await pool.query(`
+      SELECT COUNT(*) as table_exists
+      FROM information_schema.tables
+      WHERE table_schema = DATABASE()
+      AND table_name = 'seller_notifications'
+    `);
+    
+    if (tableCheck[0].table_exists === 0) {
+      return res.status(404).json({ message: 'Notification feature not available' });
+    }
+    
+    // Get the notification
+    const [rows] = await pool.query(
+      'SELECT * FROM seller_notifications WHERE notification_id = ?',
+      [req.params.id]
+    );
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Notification not found' });
+    }
+    
+    const notification = rows[0];
+    
+    // Check if user owns the notification
+    if (notification.seller_id !== req.user.user_id) {
+      return res.status(401).json({ message: 'Not authorized' });
+    }
+    
+    // Update the notification
+    const [result] = await pool.query(
+      'UPDATE seller_notifications SET is_read = ? WHERE notification_id = ?',
+      [true, req.params.id]
+    );
+    
+    if (result.affectedRows === 1) {
+      res.json({ message: 'Notification marked as read' });
+    } else {
+      res.status(400).json({ message: 'Update failed' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   createPurchase,
   getUserPurchases,
   getUserSales,
-  downloadPurchasedItem
+  downloadPurchasedItem,
+  getSellerNotifications,
+  markNotificationAsRead
 };

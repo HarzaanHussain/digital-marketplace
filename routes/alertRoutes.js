@@ -6,12 +6,14 @@ const {
   getUserAlerts,
   markAlertAsRead,
   deleteAlert,
-  getAlertTypes
+  getAlertTypes,
+  markAllAlertsAsRead
 } = require('../controllers/alertController');
 
 router.post('/', protect, createAlert);
 router.get('/', protect, getUserAlerts);
 router.put('/:id/read', protect, markAlertAsRead);
+router.put('/read-all', protect, markAllAlertsAsRead);
 router.delete('/:id', protect, deleteAlert);
 router.get('/types', getAlertTypes);
 

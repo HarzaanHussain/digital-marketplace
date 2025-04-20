@@ -21,7 +21,7 @@
                     <li id="alerts-link" class="auth-required hidden"><a href="#" class="nav-link" data-page="alerts">Alerts <span id="alert-badge" class="badge hidden">0</span></a></li>
                     <li id="login-link"><a href="#" class="nav-link" data-page="login">Login</a></li>
                     <li id="register-link"><a href="#" class="nav-link" data-page="register">Register</a></li>
-                    <li id="profile-link" class="auth-required hidden"><a href="#" class="nav-link" data-page="profile">Profile</a></li>
+                    <li id="profile-link" class="auth-required hidden"><a href="#" class="nav-link" data-page="profile">Profile <span id="notification-badge" class="badge hidden">0</span></a></li>
                     <li id="logout-link" class="auth-required hidden"><a href="#" class="nav-link" data-action="logout">Logout</a></li>
                 </ul>
             </nav>
@@ -121,7 +121,6 @@
                     <div class="item-actions">
                         <button id="purchase-button" class="btn btn-primary auth-required hidden">Purchase</button>
                         <button id="set-alert-button" class="btn btn-secondary auth-required hidden">Set Price Alert</button>
-                        <button id="delete-button" class="btn btn-danger auth-required hidden">Delete Item</button>
                     </div>
                 </div>
             </div>
@@ -262,6 +261,10 @@
                 <ul class="tab-nav">
                     <li class="tab-item active" data-tab="purchases">Your Purchases</li>
                     <li class="tab-item" data-tab="sales">Your Sales</li>
+                    <li class="tab-item" data-tab="notifications">
+                        Sale Notifications
+                        <span id="notification-badge-tab" class="badge hidden">0</span>
+                    </li>
                 </ul>
                 
                 <div class="tab-content">
@@ -277,6 +280,14 @@
                         <h3>Your Sales</h3>
                         <div id="sales-container">
                             <!-- Sales will be loaded dynamically -->
+                            <div class="loading">Loading...</div>
+                        </div>
+                    </div>
+
+                    <div id="notifications-tab" class="tab-pane">
+                        <h3>Sale Notifications</h3>
+                        <div id="notifications-container">
+                            <!-- Notifications will be loaded dynamically -->
                             <div class="loading">Loading...</div>
                         </div>
                     </div>
@@ -338,6 +349,7 @@
             
             <div class="alerts-actions">
                 <button id="new-alert-button" class="btn btn-primary">Set New Alert</button>
+                <button id="mark-all-read-button" class="btn btn-secondary">Mark All as Read</button>
             </div>
             
             <div id="alerts-container">
@@ -379,6 +391,7 @@
                         <div id="alert-price-group" class="form-group hidden">
                             <label for="alert-price-input">Price Threshold ($)</label>
                             <input type="number" id="alert-price-input" min="0.01" step="0.01">
+                            <p class="help-text">You'll receive an alert when the price drops below this amount</p>
                         </div>
                         
                         <button type="submit" class="btn btn-primary">Set Alert</button>
