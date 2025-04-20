@@ -9,6 +9,33 @@ document.addEventListener('DOMContentLoaded', () => {
         notificationCount: 0
     };
 
+    
+
+   /* ---------- Sanitation helper utilities ---------- */
+const sanitize = str => {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;           // encoded version
+  };
+  
+  const showFieldError = (el, msg) => {
+    const old = el.nextElementSibling;
+    if (old?.classList.contains('field-error')) old.remove();
+  
+    const e = document.createElement('div');
+    e.className = 'field-error';
+    e.textContent = msg;
+    el.after(e);
+  };
+
+  const clearFieldErrors = formEl => {
+    formEl.querySelectorAll('.field-error').forEach(e => e.remove());
+  };
+  
+  /* ------------------------------------------- */
+  
+
+
     // API Base URL
     const API_URL = '/api';
 
@@ -333,26 +360,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadSellerNotifications();
                 break;
 
+                 /* ---------- SELL PAGE ---------- */
             case 'sell':
-                if (!state.user) {
-                    navigateTo('login');
-                    return;
+            // 1️⃣ must be logged‑in
+            if (!state.user) {
+                navigateTo('login');
+                return;
                 }
 
+                // 2️⃣ render template & populate category <select>
                 renderTemplate('sell-template', pageContent);
                 
                 // Load categories
                 await loadCategoriesForSell();
                 
                 // Add submit handler for form
+                // 3️⃣ wire up the form
                 const sellForm = document.getElementById('sell-form');
                 if (sellForm) {
-                    sellForm.addEventListener('submit', (e) => {
-                        e.preventDefault();
-                        sellItem();
+    
+                //live validation as the user types 
+                sellForm.addEventListener('input', () => clearFieldErrors(sellForm));
+                
+
+                sellForm.addEventListener('submit', e => {
+                        e.preventDefault();          // stay on the page
+                        sellItem();                  // call the real function below
                     });
                 }
-                break;
+
+            break;
+
 
             case 'alerts':
                 if (!state.user) {
@@ -1053,7 +1091,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.getElementById('featured-items-container');
         if (!container) return;
 
-        container.innerHTML = '<div class="loading">Loading...</div>';
+        container.innerHTML = '<div class="loading"></div>';
 
         try {
             const response = await apiRequest('/items?limit=4');
@@ -1147,12 +1185,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         card.innerHTML = `
-            <div class="category-icon">
-                <i class="fas ${icon}"></i>
-            </div>
-            <div class="category-name">${category.name}</div>
-        `;
-
+        <div class="category-icon">
+          <i class="fas ${sanitize(icon)}"></i>
+        </div>
+        <div class="category-name">${sanitize(category.name)}</div>
+      `;
+      
         return card;
     }
 
@@ -1256,18 +1294,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Default thumbnail if none provided
+        //  Sanitized
         const thumbnail = item.thumbnail_path || '/img/default-thumbnail.png';
 
-        card.innerHTML = `
+             card.innerHTML = `
             <div class="item-image">
-                <img src="${thumbnail}" alt="${item.title}">
+                <img src="${sanitize(thumbnail)}" alt="${sanitize(item.title)}">
             </div>
             <div class="item-details">
-                <h3 class="item-title">${item.title}</h3>
+                <h3 class="item-title">${sanitize(item.title)}</h3>
                 <div class="item-price">$${parseFloat(item.price).toFixed(2)}</div>
-                <div class="item-seller">by ${item.seller_name || 'Unknown'}</div>
+                <div class="item-seller">by ${sanitize(item.seller_name || 'Unknown')}</div>
             </div>
-        `;
+            `;
+
 
         return card;
     }
@@ -1403,7 +1443,7 @@ document.addEventListener('DOMContentLoaded', () => {
         reviewElement.className = 'review';
 
         const date = new Date(review.created_at).toLocaleDateString();
-        
+                
         // Check if this is the current user's review
         const isUserReview = state.user && review.reviewer_id === state.user.user_id;
         
@@ -1417,15 +1457,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         reviewElement.innerHTML = `
             <div class="review-header">
-                <span class="reviewer">${review.reviewer_name}</span>
-                <span class="review-date">${date}</span>
-                ${editButton}
+                <span class="reviewer">${sanitize(review.reviewer_name)}</span>
+                <span class="review-date">${sanitize(date)}</span>
             </div>
             <div class="star-rating">
                 ${createStarRating(review.rating)}
             </div>
-            <div class="review-comment">${review.comment || ''}</div>
+            <div class="review-comment">${review.comment}</div>
         `;
+
 
         return reviewElement;
     }
@@ -1778,13 +1818,13 @@ document.addEventListener('DOMContentLoaded', () => {
         // Add message for deleted items
         const deletedNotice = purchase.is_deleted ? 
             '<div class="deleted-notice">(Item no longer listed)</div>' : '';
-
+            //sanitized
         element.innerHTML = `
             <div class="purchase-image">
-                <img src="${purchase.thumbnail_path || '/img/default-thumbnail.png'}" alt="${purchase.title}">
+                <img src="${sanitize(purchase.thumbnail_path) || '/img/default-thumbnail.png'}" alt="${sanitize(purchase.title)}">
             </div>
             <div class="purchase-details">
-                <div class="purchase-title">${purchase.title}</div>
+                <div class="purchase-title">${sanitize(purchase.title)}</div>
                 ${deletedNotice}
                 <div class="purchase-price">$${parseFloat(purchase.purchase_price).toFixed(2)}</div>
                 <div class="purchase-date">Purchased on ${date}</div>
@@ -1838,10 +1878,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         element.innerHTML = `
             <div class="sale-image">
-                <img src="${sale.thumbnail_path || '/img/default-thumbnail.png'}" alt="${sale.title}">
+                <img src="${sanitize(sale.thumbnail_path) || '/img/default-thumbnail.png'}" alt="${sanitize(sale.title)}">
             </div>
             <div class="sale-details">
-                <div class="sale-title">${sale.title}</div>
+                <div class="sale-title">${sanitize(sale.title)}</div>
                 <div class="sale-price">$${parseFloat(sale.price).toFixed(2)}</div>
                 <div class="sale-date">Listed on ${new Date(sale.created_at).toLocaleDateString()}</div>
                 ${sale.is_deleted ? '<div class="deleted-notice">(No longer listed)</div>' : ''}
@@ -1861,6 +1901,94 @@ document.addEventListener('DOMContentLoaded', () => {
         return element;
     }
 
+    // Sell Page Functions
+    // Load categories for sell form
+    async function loadCategoriesForSell() {
+                const categoryInput = document.getElementById('item-category-input');
+                if (!categoryInput) return;
+
+                try {
+                    const categories = await apiRequest('/categories');
+
+                    // Keep the first option
+                    const firstOption = categoryInput.options[0];
+                    categoryInput.innerHTML = '';
+                    categoryInput.appendChild(firstOption);
+
+                    categories.forEach(category => {
+                        const option = document.createElement('option');
+                        option.value = category.category_id;
+                        option.textContent = category.name;
+                        categoryInput.appendChild(option);
+                    });
+                } catch (error) {
+                    console.error('Failed to load categories:', error);
+                }
+            }
+
+            
+            // Sell an item
+            // Sell an item  (replace the whole previous function)
+        async function sellItem () {
+            const form = document.getElementById('sell-form');
+            clearFieldErrors(form);
+        
+            // --- grab fields -------------------------------
+            const titleEl = document.getElementById('item-title-input');
+            const descEl  = document.getElementById('item-description-input');
+            const priceEl = document.getElementById('item-price-input');
+            const catEl   = document.getElementById('item-category-input');
+            const fileEl  = document.getElementById('item-file-input');
+            const thumbEl = document.getElementById('item-thumbnail-input');
+        
+            const title = titleEl.value.trim();
+            const description = descEl.value.trim();
+            const price = parseFloat(priceEl.value);
+            const categoryId = catEl.value;
+        
+            // --- client‑side validation --------------------
+            let bad = false;
+        
+            const titleOk = /^[\w\s\-&'!.:,()]{3,60}$/.test(title);
+            if (!titleOk) {
+            showFieldError(titleEl, '3‑60 letters/numbers & punctuation only');
+            bad = true;
+            }
+            if (!description) {
+            showFieldError(descEl, 'Description is required');
+            bad = true;
+            }
+            if (isNaN(price) || price < 0.25) {
+            showFieldError(priceEl, 'Price must be at least $0.25');
+            bad = true;
+            }
+            if (!categoryId) {
+            showFieldError(catEl, 'Choose a category');
+            bad = true;
+            }
+            if (bad) return;
+        
+            // --- build payload -----------------------------
+            const formData = new FormData();
+            formData.append('title',        sanitize(title));
+            formData.append('description',  sanitize(description));
+            formData.append('price',        price);
+            formData.append('category_id',  categoryId);
+            if (fileEl.files[0])  formData.append('file',      fileEl.files[0]);
+            if (thumbEl.files[0]) formData.append('thumbnail', thumbEl.files[0]);
+        
+            // --- send to API -------------------------------
+            try {
+            const item = await apiRequest('/items', 'POST', formData);
+            showAlert('Item listed successfully!', 'success');
+            navigateTo('item', { itemId: item.item_id });
+            } catch (err) {
+            showAlert('Failed to list item: ' + err.message, 'danger');
+            console.error(err);
+            }
+        }
+  
+  
     // Alerts Page Functions
     // Load user alerts
     async function loadAlerts() {
@@ -1929,12 +2057,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 alertTitle = 'Alert';
                 alertInfo = 'You have a new alert';
         }
-
+            //sanitized
         element.innerHTML = `
             <div class="alert-content">
-                <div class="alert-title">${alertTitle}</div>
-                <div class="alert-info">${alertInfo}</div>
-                <div class="alert-date">${new Date(alert.created_at).toLocaleString()}</div>
+                   <div class="alert-title">${sanitize(alertTitle)}</div>
+                    <div class="alert-info">${sanitize(alertInfo)}</div>
+                    <div class="alert-date">${sanitize(new Date(alert.created_at).toLocaleString())}</div>
             </div>
             <div class="alert-actions">
                 ${!alert.is_read ? `<button class="btn btn-secondary" data-action="markRead">Mark as Read</button>` : ''}
