@@ -49,13 +49,13 @@ const checkPriceDropAlerts = async (itemId, newPrice, sellerId) => {
       [itemId, sellerId]
     );
     
-    // Create alerts for users where the new price is below their threshold
+    // Create alerts ONLY for users where the new price is STRICTLY LESS than their threshold
     for (const alert of alerts) {
-      if (alert.price_threshold && newPrice <= alert.price_threshold) {
+      if (alert.price_threshold && parseFloat(newPrice) <= parseFloat(alert.price_threshold)) {
         await pool.query(
-          `INSERT INTO user_alerts (user_id, alert_type_id, item_id, is_read)
-           VALUES (?, ?, ?, ?)`,
-          [alert.user_id, alert.alert_type_id, itemId, false]
+          `INSERT INTO user_alerts (user_id, alert_type_id, item_id, is_read, price_threshold)
+           VALUES (?, ?, ?, ?, ?)`,
+          [alert.user_id, alert.alert_type_id, itemId, false, alert.price_threshold]
         );
       }
     }

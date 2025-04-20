@@ -14,13 +14,7 @@ const createAlert = async (req, res) => {
       return res.status(400).json({ message: 'Please provide an alert type' });
     }
     
-    // At least one of item_id or category_id must be provided
-    if (!item_id && !category_id) {
-      await pool.query('ROLLBACK');
-      return res.status(400).json({ message: 'Please provide either an item or a category' });
-    }
-    
-    // Verify alert type exists
+    // Verify alert type exists and is a Price Drop alert
     const [alertTypeRows] = await pool.query(
       'SELECT * FROM alert_types WHERE alert_type_id = ?',
       [alert_type_id]
@@ -33,8 +27,15 @@ const createAlert = async (req, res) => {
     
     const alertType = alertTypeRows[0];
     
-    // Verify item exists and is not deleted if provided
-    if (item_id) {
+    // Specifically for Price Drop alerts
+    if (alertType.name === 'Price Drop') {
+      // Require an item for price drop alerts
+      if (!item_id) {
+        await pool.query('ROLLBACK');
+        return res.status(400).json({ message: 'Item is required for Price Drop alerts' });
+      }
+      
+      // Verify item exists
       const [itemRows] = await pool.query(
         'SELECT * FROM items WHERE item_id = ? AND is_deleted = false',
         [item_id]
@@ -53,29 +54,22 @@ const createAlert = async (req, res) => {
         return res.status(400).json({ message: 'You cannot set alerts for your own items' });
       }
       
-      // Validate price threshold for price drop alerts
-      if (alertType.name === 'Price Drop' && (!price_threshold || price_threshold >= item.price)) {
+      // Validate price threshold
+      if (!price_threshold || parseFloat(price_threshold) <= 0) {
+        await pool.query('ROLLBACK');
+        return res.status(400).json({ message: 'Price threshold must be a positive number' });
+      }
+      
+      // Ensure the threshold is below the current price
+      if (parseFloat(price_threshold) >= parseFloat(item.price)) {
         await pool.query('ROLLBACK');
         return res.status(400).json({ 
-          message: 'Price threshold must be less than the current price'
+          message: `Price threshold must be below the current price ($${parseFloat(item.price).toFixed(2)})`
         });
       }
     }
     
-    // Verify category exists if provided
-    if (category_id) {
-      const [categoryRows] = await pool.query(
-        'SELECT * FROM categories WHERE category_id = ?',
-        [category_id]
-      );
-      
-      if (categoryRows.length === 0) {
-        await pool.query('ROLLBACK');
-        return res.status(400).json({ message: 'Category not found' });
-      }
-    }
-    
-    // FIX: Check for duplicate alerts with proper SQL syntax
+    // Check for existing similar alerts
     let duplicateCheckQuery = 'SELECT * FROM user_alerts WHERE user_id = ? AND alert_type_id = ?';
     const duplicateCheckParams = [req.user.user_id, alert_type_id];
     
