@@ -200,42 +200,138 @@ const getUserSales = async (req, res) => {
   }
 };
 
+
 // @desc    Download purchased item
 // @route   GET /api/purchases/:id/download
 // @access  Private
 const downloadPurchasedItem = async (req, res) => {
   try {
+    console.log('Download request for purchase ID:', req.params.id);
+    console.log('User ID:', req.user?.user_id);
+    
     // Check if user has purchased this item
     const [purchases] = await pool.query(
-      'SELECT p.*, i.file_path, i.title FROM purchases p JOIN items i ON p.item_id = i.item_id WHERE p.purchase_id = ? AND p.buyer_id = ?',
-      [req.params.id, req.user.user_id]
+      'SELECT p.*, i.file_path, i.title, i.seller_id FROM purchases p JOIN items i ON p.item_id = i.item_id WHERE p.purchase_id = ?',
+      [req.params.id]
     );
     
     if (purchases.length === 0) {
-      return res.status(404).json({ message: 'Purchase not found or not authorized' });
+      return res.status(404).json({ message: 'Purchase not found' });
     }
     
     const purchase = purchases[0];
+    console.log('Found purchase:', { 
+      purchase_id: purchase.purchase_id,
+      buyer_id: purchase.buyer_id,
+      seller_id: purchase.seller_id,
+      file_path: purchase.file_path
+    });
     
-    // Check if file exists
-    if (!purchase.file_path) {
-      return res.status(404).json({ message: 'File not found' });
+    // Check if the requester is either the buyer or the seller of the item
+    if (purchase.buyer_id !== req.user.user_id && purchase.seller_id !== req.user.user_id) {
+      return res.status(401).json({ message: 'Not authorized to download this file' });
     }
     
-    const filePath = path.join(__dirname, '..', 'public', purchase.file_path);
+    // Check if file exists
+    if (!purchase.file_path || purchase.file_path === '') {
+      console.log('No file path found, serving default file');
+      // Return a default file if no file is attached
+      const defaultFilePath = path.join(__dirname, '..', 'public', 'downloads', 'default-item.txt');
+      
+      // Create the default file if it doesn't exist
+      if (!fs.existsSync(defaultFilePath)) {
+        const downloadsDir = path.join(__dirname, '..', 'public', 'downloads');
+        
+        // Create downloads directory if it doesn't exist
+        if (!fs.existsSync(downloadsDir)) {
+          fs.mkdirSync(downloadsDir, { recursive: true });
+        }
+        
+        // Create a simple default file with some info
+        fs.writeFileSync(
+          defaultFilePath, 
+          `This is a placeholder file for "${purchase.title}"\nPurchase ID: ${purchase.purchase_id}\nDownloaded on: ${new Date().toLocaleString()}`
+        );
+      }
+      
+      // Generate a suitable filename
+      const fileName = purchase.title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.txt';
+      
+      console.log('Sending default file as:', fileName);
+      
+      // Send the default file
+      return res.download(defaultFilePath, fileName);
+    }
     
+    // First check if this is a full path or a relative path
+    let filePath;
+    if (path.isAbsolute(purchase.file_path)) {
+      filePath = purchase.file_path;
+    } else {
+      // If it starts with a slash, remove it
+      const relativePath = purchase.file_path.startsWith('/') 
+        ? purchase.file_path.substring(1) 
+        : purchase.file_path;
+        
+      // Join with the public directory path
+      filePath = path.join(__dirname, '..', 'public', relativePath);
+    }
+    
+    console.log('Resolved file path:', filePath);
+    
+    // Check if file exists on server
     if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ message: 'File not found on server' });
+      console.error(`File not found at resolved path: ${filePath}`);
+      
+      // Try one more time with the raw path
+      const alternatePath = path.join(__dirname, '..', 'public', purchase.file_path);
+      console.log('Trying alternate path:', alternatePath);
+      
+      if (fs.existsSync(alternatePath)) {
+        filePath = alternatePath;
+        console.log('Found file at alternate path');
+      } else {
+        console.log('File still not found, serving default file');
+        
+        // Return a default file if the actual file is missing
+        const defaultFilePath = path.join(__dirname, '..', 'public', 'downloads', 'default-item.txt');
+        
+        // Create the default file if it doesn't exist
+        if (!fs.existsSync(defaultFilePath)) {
+          const downloadsDir = path.join(__dirname, '..', 'public', 'downloads');
+          
+          // Create downloads directory if it doesn't exist
+          if (!fs.existsSync(downloadsDir)) {
+            fs.mkdirSync(downloadsDir, { recursive: true });
+          }
+          
+          // Create a simple default file with some info
+          fs.writeFileSync(
+            defaultFilePath, 
+            `This is a placeholder file for "${purchase.title}"\nThe original file was not found.\nPurchase ID: ${purchase.purchase_id}\nDownloaded on: ${new Date().toLocaleString()}`
+          );
+        }
+        
+        // Generate a suitable filename
+        const fileName = purchase.title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.txt';
+        
+        console.log('Sending default file as:', fileName);
+        
+        // Send the default file
+        return res.download(defaultFilePath, fileName);
+      }
     }
     
     // Generate a suitable filename
     const fileName = purchase.title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + path.extname(purchase.file_path);
     
+    console.log(`Sending file: ${filePath} as ${fileName}`);
+    
     // Send file
     res.download(filePath, fileName);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Download error:', error);
+    res.status(500).json({ message: 'Server error while downloading file' });
   }
 };
 

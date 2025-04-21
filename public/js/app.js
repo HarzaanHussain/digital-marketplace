@@ -72,14 +72,14 @@ document.addEventListener('DOMContentLoaded', () => {
         document.addEventListener('click', handleClick);
 
         // Handle direct price update button clicks
-        document.addEventListener('click', function(e) {
+        document.addEventListener('click', function (e) {
             if (e.target && e.target.id === 'update-price-button') {
                 submitPriceUpdate();
             }
         });
 
         // Handle close dialog button clicks
-        document.addEventListener('click', function(e) {
+        document.addEventListener('click', function (e) {
             if (e.target && e.target.classList.contains('close-button')) {
                 closePriceEditDialog();
             }
@@ -180,7 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (page === 'home' || page === 'browse') {
             state.currentItemId = null;
         }
-        
+
         state.currentPage = page;
         state.params = params;
 
@@ -401,10 +401,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 renderTemplate('sell-template', pageContent);
-                
+
                 // Load categories
                 await loadCategoriesForSell();
-                
+
                 // Add submit handler for form
                 const sellForm = document.getElementById('sell-form');
                 if (sellForm) {
@@ -496,10 +496,10 @@ document.addEventListener('DOMContentLoaded', () => {
             showAlert('Invalid item ID', 'danger');
             return;
         }
-        
+
         // Close existing dialog if any
         closePriceEditDialog();
-        
+
         // Get the current item data
         apiRequest(`/items/${itemId}`, 'GET')
             .then(item => {
@@ -519,20 +519,20 @@ document.addEventListener('DOMContentLoaded', () => {
                         <button type="button" id="update-price-button" class="btn btn-primary">Update Price</button>
                     </div>
                 `;
-    
+
                 // Add to the page
                 document.body.appendChild(dialog);
-                
+
                 // Show the dialog
                 dialog.style.display = 'block';
-                
+
                 // Set up direct event listeners without event delegation
                 const updateButton = document.getElementById('update-price-button');
                 if (updateButton) {
                     // Use a one-time event listener to prevent double-firing
                     updateButton.addEventListener('click', submitPriceUpdate, { once: true });
                 }
-                
+
                 const closeButton = dialog.querySelector('.close-button');
                 if (closeButton) {
                     closeButton.addEventListener('click', closePriceEditDialog);
@@ -555,45 +555,45 @@ document.addEventListener('DOMContentLoaded', () => {
     function submitPriceUpdate(e) {
         // Prevent any event bubbling
         if (e) e.stopPropagation();
-        
+
         const itemIdElement = document.getElementById('edit-item-id');
         const priceElement = document.getElementById('edit-price-input');
-        
+
         if (!itemIdElement || !priceElement) {
             showAlert('Form elements not found', 'danger');
             return;
         }
-        
+
         const itemId = itemIdElement.value;
         const newPrice = priceElement.value;
-        
+
         if (!itemId) {
             showAlert('Item ID not found', 'danger');
             return;
         }
-        
+
         // Validate price
         if (!newPrice || parseFloat(newPrice) <= 0) {
             showAlert('Please enter a valid price greater than 0', 'warning');
             return;
         }
-    
+
         // Create FormData with just the price
         const formData = new FormData();
         formData.append('price', newPrice);
-        
+
         // Disable the button to prevent double-click
         const updateButton = document.getElementById('update-price-button');
         if (updateButton) updateButton.disabled = true;
-        
+
         // Update the item with just the price change
         apiRequest(`/items/${itemId}`, 'PUT', formData)
             .then(updatedItem => {
                 showAlert('Price updated successfully!', 'success');
-                
+
                 // Close the dialog
                 closePriceEditDialog();
-                
+
                 // Refresh the current page to show updated price
                 if (state.currentPage === 'item' && state.params.itemId == itemId) {
                     loadItem(itemId);
@@ -607,16 +607,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (updateButton) updateButton.disabled = false;
             });
     }
-    
+
 
     // Load categories for sell form
     async function loadCategoriesForSell() {
         const categoryInput = document.getElementById('item-category-input');
         if (!categoryInput) return;
-    
+
         try {
             const categories = await apiRequest('/categories');
-    
+
             // Keep the first option (or create one if it doesn't exist)
             let firstOption;
             if (categoryInput.options.length > 0) {
@@ -626,10 +626,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 firstOption.value = '';
                 firstOption.textContent = 'Select a category';
             }
-            
+
             categoryInput.innerHTML = '';
             categoryInput.appendChild(firstOption);
-    
+
             // Add all categories
             categories.forEach(category => {
                 const option = document.createElement('option');
@@ -637,9 +637,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 option.textContent = category.name;
                 categoryInput.appendChild(option);
             });
-            
+
             return categories;
-            
+
         } catch (error) {
             showAlert('Failed to load categories. Please try again.', 'danger');
             console.error('Failed to load categories:', error);
@@ -654,28 +654,28 @@ document.addEventListener('DOMContentLoaded', () => {
         const categoryInput = document.getElementById('item-category-input');
         const fileInput = document.getElementById('item-file-input');
         const thumbnailInput = document.getElementById('item-thumbnail-input');
-        
+
         if (!titleInput || !priceInput || !categoryInput) {
             showAlert('Form elements not found', 'danger');
             return;
         }
-        
+
         const title = titleInput.value.trim();
         const description = descriptionInput ? descriptionInput.value.trim() : '';
         const price = priceInput.value;
         const categoryId = categoryInput.value;
-        
+
         // Validation
         if (!title) {
             showAlert('Please enter a title', 'warning');
             return;
         }
-        
+
         if (!price || parseFloat(price) <= 0) {
             showAlert('Please enter a valid price greater than 0', 'warning');
             return;
         }
-        
+
         if (!categoryId) {
             showAlert('Please select a category', 'warning');
             return;
@@ -700,7 +700,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             // Use POST method for new items
             const item = await apiRequest('/items', 'POST', formData);
-            
+
             showAlert('Item listed successfully!', 'success');
 
             // Navigate to item page
@@ -717,21 +717,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // Edit a review
     function editReview(reviewId, reviewElement) {
         if (!reviewElement) return;
-        
+
         // Store the original content to restore if canceled
         if (!reviewElement.dataset.originalRating) {
             const ratingStars = reviewElement.querySelector('.star-rating')?.innerHTML;
             const commentText = reviewElement.querySelector('.review-comment')?.textContent;
-            
+
             if (!ratingStars || !commentText) return;
-            
+
             reviewElement.dataset.originalRating = ratingStars;
             reviewElement.dataset.originalComment = commentText;
             reviewElement.dataset.reviewId = reviewId;
 
             // Get current rating
             const activeStars = reviewElement.querySelectorAll('.star-rating .fas.fa-star').length;
-            
+
             // Create edit form
             const editForm = document.createElement('form');
             editForm.className = 'edit-review-form';
@@ -755,16 +755,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     <button type="button" class="btn btn-secondary" data-action="cancelEditReview">Cancel</button>
                 </div>
             `;
-            
+
             // Replace the review content with the edit form
             const reviewCommentEl = reviewElement.querySelector('.review-comment');
             const starRatingEl = reviewElement.querySelector('.star-rating');
-            
+
             if (reviewCommentEl) reviewCommentEl.style.display = 'none';
             if (starRatingEl) starRatingEl.style.display = 'none';
-            
+
             reviewElement.appendChild(editForm);
-            
+
             // Add star rating functionality
             const editStars = editForm.querySelectorAll('.edit-stars i');
             editStars.forEach(star => {
@@ -774,7 +774,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (ratingInput) {
                         ratingInput.value = rating;
                     }
-                    
+
                     // Update star display
                     editStars.forEach(s => {
                         if (s.dataset.rating <= rating) {
@@ -787,7 +787,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 });
             });
-            
+
             // Add submit handler
             editForm.addEventListener('submit', (e) => {
                 e.preventDefault();
@@ -799,55 +799,55 @@ document.addEventListener('DOMContentLoaded', () => {
     // Submit review edit
     async function submitReviewEdit(reviewId, reviewElement) {
         if (!reviewElement) return;
-        
+
         const editForm = reviewElement.querySelector('.edit-review-form');
         if (!editForm) return;
-        
+
         const ratingInput = editForm.querySelector('.edit-rating-input');
         const commentInput = editForm.querySelector('.edit-comment');
-        
+
         if (!ratingInput || !commentInput) {
             showAlert('Form elements not found', 'danger');
             return;
         }
-        
+
         const rating = ratingInput.value;
         const comment = commentInput.value;
-        
+
         // Validate rating
         if (!rating || isNaN(parseInt(rating)) || parseInt(rating) < 1 || parseInt(rating) > 5) {
             showAlert('Please select a valid rating between 1 and 5', 'warning');
             return;
         }
-        
+
         try {
             await apiRequest(`/reviews/${reviewId}`, 'PUT', {
                 rating: parseInt(rating),
                 comment
             });
-            
+
             showAlert('Review updated successfully!', 'success');
-            
+
             // Update the review display with the new star rating
             const updatedStarRating = createStarRating(rating);
-            
+
             const starRatingEl = reviewElement.querySelector('.star-rating');
             const reviewCommentEl = reviewElement.querySelector('.review-comment');
-            
+
             if (starRatingEl) starRatingEl.innerHTML = updatedStarRating;
             if (reviewCommentEl) reviewCommentEl.textContent = comment;
-            
+
             // Remove form and show original content
             reviewElement.removeChild(editForm);
-            
+
             if (starRatingEl) starRatingEl.style.display = 'block';
             if (reviewCommentEl) reviewCommentEl.style.display = 'block';
-            
+
             // Clear stored originals
             delete reviewElement.dataset.originalRating;
             delete reviewElement.dataset.originalComment;
             delete reviewElement.dataset.reviewId;
-            
+
         } catch (error) {
             showAlert('Failed to update review: ' + error.message, 'danger');
         }
@@ -856,20 +856,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // Cancel review edit
     function cancelEditReview(reviewElement) {
         if (!reviewElement) return;
-        
+
         // Remove the edit form
         const editForm = reviewElement.querySelector('.edit-review-form');
         if (editForm) {
             reviewElement.removeChild(editForm);
         }
-        
+
         // Show original content
         const reviewCommentEl = reviewElement.querySelector('.review-comment');
         const starRatingEl = reviewElement.querySelector('.star-rating');
-        
+
         if (reviewCommentEl) reviewCommentEl.style.display = 'block';
         if (starRatingEl) starRatingEl.style.display = 'block';
-        
+
         // Clear stored originals
         delete reviewElement.dataset.originalRating;
         delete reviewElement.dataset.originalComment;
@@ -882,7 +882,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showAlert('Invalid item ID', 'danger');
             return;
         }
-        
+
         if (confirm(`Are you sure you want to delete "${title}"? This cannot be undone.`)) {
             deleteItem(itemId);
         }
@@ -894,12 +894,12 @@ document.addEventListener('DOMContentLoaded', () => {
             showAlert('Invalid item ID', 'danger');
             return;
         }
-        
+
         try {
             await apiRequest(`/items/${itemId}`, 'DELETE');
-            
+
             showAlert('Item deleted successfully!', 'success');
-            
+
             // If on item detail page, navigate back to profile
             if (state.currentPage === 'item') {
                 navigateTo('profile');
@@ -913,36 +913,132 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /// Download a purchased item
     // Download a purchased item
     async function downloadPurchasedItem(itemId) {
         if (!itemId) {
             showAlert('Invalid item ID', 'danger');
             return;
         }
-        
+
         try {
             // Get the purchase ID from purchases data
             const purchasesResponse = await apiRequest('/purchases');
             const purchases = purchasesResponse.purchases || purchasesResponse;
             const purchase = purchases.find(p => p.item_id === parseInt(itemId));
-            
+
             if (!purchase) {
                 showAlert('Item not found in your purchases', 'danger');
                 return;
             }
-            
-            // Create temporary anchor to initiate download
-            const a = document.createElement('a');
-            a.href = `/api/purchases/${purchase.purchase_id}/download`;
-            a.download = '';
-            a.target = '_blank';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            
-            showAlert('Download started!', 'success');
+
+            showAlert('Starting download...', 'info');
+
+            // Create a download token element to show download progress
+            const downloadToken = document.createElement('div');
+            downloadToken.className = 'download-token';
+            downloadToken.innerHTML = `
+            <div class="download-info">
+                <span>Downloading "${purchase.title}"</span>
+                <div class="download-progress">
+                    <div class="progress-bar"></div>
+                </div>
+            </div>
+        `;
+            document.body.appendChild(downloadToken);
+
+            try {
+                // Use the Fetch API with proper authorization
+                const response = await fetch(`/api/purchases/${purchase.purchase_id}/download`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${state.token}`
+                    }
+                });
+
+                // Check if the response is successful
+                if (!response.ok) {
+                    throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+                }
+
+                // Get the filename from the content-disposition header if available
+                let filename = purchase.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                const contentDisposition = response.headers.get('content-disposition');
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename="(.+)"|filename=([^;]+)/);
+                    if (filenameMatch) {
+                        filename = filenameMatch[1] || filenameMatch[2];
+                    }
+                }
+
+                // Get content type to determine extension if needed
+                const contentType = response.headers.get('content-type');
+                if (!filename.includes('.')) {
+                    // Add extension based on content type
+                    if (contentType === 'application/pdf') {
+                        filename += '.pdf';
+                    } else if (contentType === 'text/plain') {
+                        filename += '.txt';
+                    } else if (contentType === 'application/zip') {
+                        filename += '.zip';
+                    } else if (contentType === 'image/jpeg') {
+                        filename += '.jpg';
+                    } else if (contentType === 'image/png') {
+                        filename += '.png';
+                    } else {
+                        // Default extension for unknown types
+                        filename += '.bin';
+                    }
+                }
+
+                // Convert response to blob
+                const blob = await response.blob();
+
+                // Create a download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+
+                // Trigger the download
+                a.click();
+
+                // Clean up
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                // Show success message
+                showAlert('Download complete!', 'success');
+
+                // Remove the download token after a delay
+                setTimeout(() => {
+                    if (downloadToken.parentNode) {
+                        downloadToken.parentNode.removeChild(downloadToken);
+                    }
+                }, 2000);
+
+            } catch (error) {
+                console.error('Download error:', error);
+
+                // Remove the download token
+                if (downloadToken.parentNode) {
+                    downloadToken.parentNode.removeChild(downloadToken);
+                }
+
+                // Show error message
+                if (error.message.includes('401')) {
+                    showAlert('Authentication failed. Please log in again.', 'danger');
+                } else if (error.message.includes('404')) {
+                    showAlert('File not found. The file may have been deleted.', 'danger');
+                } else {
+                    showAlert(`Download failed: ${error.message}`, 'danger');
+                }
+            }
         } catch (error) {
-            showAlert('Failed to download item: ' + error.message, 'danger');
+            console.error('Error initiating download:', error);
+            showAlert('Failed to initiate download: ' + error.message, 'danger');
         }
     }
 
@@ -970,24 +1066,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Reload notifications
             loadSellerNotifications();
-            
+
             // Update notification count
             checkForSellerNotifications();
         } catch (error) {
             showAlert('Failed to mark notification as read', 'danger');
         }
     }
-    
+
     // Mark all alerts as read
     async function markAllAlertsAsRead() {
         try {
             await apiRequest('/alerts/read-all', 'PUT');
-            
+
             showAlert('All alerts marked as read', 'success');
-            
+
             // Reload alerts
             loadAlerts();
-            
+
             // Update alert count
             checkForAlerts();
         } catch (error) {
@@ -1006,7 +1102,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const logoutLink = document.getElementById('logout-link');
         const sellLink = document.getElementById('sell-link');
         const alertsLink = document.getElementById('alerts-link');
-        
+
         if (loginLink) loginLink.classList.toggle('hidden', isLoggedIn);
         if (registerLink) registerLink.classList.toggle('hidden', isLoggedIn);
         if (profileLink) profileLink.classList.toggle('hidden', !isLoggedIn);
@@ -1020,14 +1116,14 @@ document.addEventListener('DOMContentLoaded', () => {
             alertBadge.classList.toggle('hidden', state.alertCount === 0);
             alertBadge.textContent = state.alertCount;
         }
-        
+
         // Update notification badge
         const notificationBadge = document.getElementById('notification-badge');
         if (notificationBadge) {
             notificationBadge.classList.toggle('hidden', state.notificationCount === 0);
             notificationBadge.textContent = state.notificationCount;
         }
-        
+
         // Also update the notification badge in the tab if it exists
         const notificationBadgeTab = document.getElementById('notification-badge-tab');
         if (notificationBadgeTab) {
@@ -1104,12 +1200,12 @@ document.addEventListener('DOMContentLoaded', () => {
     async function login() {
         const emailInput = document.getElementById('login-email');
         const passwordInput = document.getElementById('login-password');
-        
+
         if (!emailInput || !passwordInput) {
             showAlert('Form elements not found', 'danger');
             return;
         }
-        
+
         const email = emailInput.value;
         const password = passwordInput.value;
 
@@ -1141,12 +1237,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const fullNameInput = document.getElementById('register-full-name');
         const passwordInput = document.getElementById('register-password');
         const confirmPasswordInput = document.getElementById('register-confirm-password');
-        
+
         if (!usernameInput || !emailInput || !passwordInput || !confirmPasswordInput) {
             showAlert('Form elements not found', 'danger');
             return;
         }
-        
+
         const username = usernameInput.value;
         const email = emailInput.value;
         const fullName = fullNameInput ? fullNameInput.value : '';
@@ -1338,7 +1434,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (params.category) queryParams.push(`category=${encodeURIComponent(params.category)}`);
         if (params.categoryId) queryParams.push(`category=${encodeURIComponent(params.categoryId)}`);
         if (params.seller) queryParams.push(`seller=${encodeURIComponent(params.seller)}`);
-        
+
         // Add pagination
         const page = params.page || 1;
         const limit = params.limit || 12;
@@ -1363,7 +1459,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const itemElement = createItemCard(item);
                 container.appendChild(itemElement);
             });
-            
+
             // Add pagination controls if available
             if (pagination) {
                 const paginationElement = createPagination(pagination, params);
@@ -1379,7 +1475,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function createPagination(pagination, currentParams) {
         const paginationDiv = document.createElement('div');
         paginationDiv.className = 'pagination';
-        
+
         // Previous page button
         if (pagination.page > 1) {
             const prevButton = document.createElement('button');
@@ -1391,13 +1487,13 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             paginationDiv.appendChild(prevButton);
         }
-        
+
         // Page number
         const pageInfo = document.createElement('span');
         pageInfo.className = 'page-info';
         pageInfo.textContent = `Page ${pagination.page} of ${pagination.totalPages}`;
         paginationDiv.appendChild(pageInfo);
-        
+
         // Next page button
         if (pagination.page < pagination.totalPages) {
             const nextButton = document.createElement('button');
@@ -1409,14 +1505,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             paginationDiv.appendChild(nextButton);
         }
-        
+
         return paginationDiv;
     }
 
     // Create an item card element
     function createItemCard(item) {
         if (!item || !item.item_id) return null;
-        
+
         const card = document.createElement('div');
         card.className = 'item-card';
         card.dataset.id = item.item_id;
@@ -1477,7 +1573,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const categoryEl = document.getElementById('item-category');
             const sellerEl = document.getElementById('item-seller');
             const priceEl = document.getElementById('item-price');
-            
+
             if (titleEl) titleEl.textContent = item.title;
             if (descriptionEl) descriptionEl.textContent = item.description;
             if (categoryEl) categoryEl.textContent = item.category_name;
@@ -1506,50 +1602,50 @@ document.addEventListener('DOMContentLoaded', () => {
                 purchaseButton.textContent = 'Edit Price';
                 purchaseButton.dataset.action = 'editItem';
                 purchaseButton.dataset.id = item.item_id;
-                
+
                 // Remove any existing delete buttons first
                 const existingDeleteBtn = itemActions.querySelector('.btn-danger');
                 if (existingDeleteBtn) {
                     existingDeleteBtn.remove();
                 }
-                
+
                 // Create delete button
                 const deleteButton = document.createElement('button');
                 deleteButton.className = 'btn btn-danger';
                 deleteButton.textContent = 'Delete Item';
                 deleteButton.dataset.id = item.item_id;
                 deleteButton.dataset.action = 'deleteItem';
-                
+
                 // Hide alert button for owner
                 if (setAlertButton) {
                     setAlertButton.classList.add('hidden');
                 }
-                
+
                 // Add delete button to actions container
                 itemActions.appendChild(deleteButton);
             } else {
                 // Non-owner view - show purchase button
                 purchaseButton.textContent = 'Purchase';
                 purchaseButton.dataset.action = 'purchaseItem';
-                
+
                 // Check if user has already purchased this item
                 if (state.user) {
                     try {
                         const purchasesResponse = await apiRequest('/purchases');
                         const purchases = purchasesResponse.purchases || purchasesResponse;
                         const alreadyPurchased = purchases.some(p => p.item_id === parseInt(itemId));
-                        
+
                         if (alreadyPurchased) {
                             // Already purchased - show download button instead
                             purchaseButton.textContent = 'Download';
                             purchaseButton.dataset.action = 'downloadItem';
                             purchaseButton.dataset.id = itemId;
-                            
+
                             // Hide alert button for buyers who already purchased
                             if (setAlertButton) {
                                 setAlertButton.classList.add('hidden');
                             }
-                            
+
                             // Show review form
                             const reviewForm = document.querySelector('.add-review');
                             if (reviewForm) {
@@ -1590,17 +1686,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // Create a review element
     function createReviewElement(review) {
         if (!review) return null;
-        
+
         const reviewElement = document.createElement('div');
         reviewElement.className = 'review';
 
         const date = new Date(review.created_at).toLocaleDateString();
-        
+
         // Check if this is the current user's review
         const isUserReview = state.user && review.reviewer_id === state.user.user_id;
-        
+
         // Add edit buttons for user's own reviews
-        const editButton = isUserReview ? 
+        const editButton = isUserReview ?
             `<div class="review-actions">
                 <button class="btn btn-secondary btn-sm" data-action="editReview" data-id="${review.review_id}">
                     <i class="fas fa-edit"></i> Edit
@@ -1668,15 +1764,15 @@ document.addEventListener('DOMContentLoaded', () => {
             showAlert('Invalid item ID', 'danger');
             return;
         }
-        
+
         const ratingInput = document.getElementById('rating-input');
         const commentInput = document.getElementById('review-comment');
-        
+
         if (!ratingInput || !commentInput) {
             showAlert('Form elements not found', 'danger');
             return;
         }
-        
+
         const rating = ratingInput.value;
         const comment = commentInput.value;
 
@@ -1711,12 +1807,12 @@ document.addEventListener('DOMContentLoaded', () => {
             showAlert('Invalid item ID', 'danger');
             return;
         }
-        
+
         // Confirm the purchase
         if (!confirm('Are you sure you want to purchase this item?')) {
             return;
         }
-        
+
         try {
             await apiRequest('/purchases', 'POST', { item_id: itemId });
 
@@ -1736,39 +1832,39 @@ document.addEventListener('DOMContentLoaded', () => {
             showAlert('Invalid item ID', 'danger');
             return;
         }
-        
+
         // First check if the user has already purchased this item
         if (state.user) {
             apiRequest('/purchases')
                 .then(response => {
                     const purchases = response.purchases || response;
                     const alreadyPurchased = purchases.some(p => p.item_id === parseInt(itemId));
-                    
+
                     if (alreadyPurchased) {
                         showAlert('You have already purchased this item, no need for alerts', 'info');
                         return;
                     }
-                    
+
                     // Continue with opening the alert modal if not purchased
                     navigateTo('alerts');
-                    
+
                     // Wait for page to load and then open modal
                     setTimeout(() => {
                         openNewAlertModal();
-                        
+
                         // Pre-select item
                         const alertItemInput = document.getElementById('alert-item-input');
                         if (alertItemInput) {
                             alertItemInput.value = itemId;
                         }
-                        
+
                         // Set alert type to Price Drop by default
                         const alertTypeInput = document.getElementById('alert-type-input');
                         if (alertTypeInput && alertTypeInput.options.length > 0) {
-                            const priceDropOption = Array.from(alertTypeInput.options).find(opt => 
+                            const priceDropOption = Array.from(alertTypeInput.options).find(opt =>
                                 opt.textContent === 'Price Drop'
                             );
-                            
+
                             if (priceDropOption) {
                                 alertTypeInput.value = priceDropOption.value;
                                 // Trigger change event to update form
@@ -1780,7 +1876,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
                 .catch(error => {
                     console.error('Error checking purchase status:', error);
-                    
+
                     // Fall back to opening the modal anyway
                     navigateTo('alerts');
                     setTimeout(() => {
@@ -1816,7 +1912,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const usernameInput = document.getElementById('profile-username');
             const emailInput = document.getElementById('profile-email');
             const fullNameInput = document.getElementById('profile-full-name');
-            
+
             if (usernameInput) usernameInput.value = profile.username;
             if (emailInput) emailInput.value = profile.email;
             if (fullNameInput) fullNameInput.value = profile.full_name || '';
@@ -1837,12 +1933,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const emailInput = document.getElementById('profile-email');
         const fullNameInput = document.getElementById('profile-full-name');
         const passwordInput = document.getElementById('profile-password');
-        
+
         if (!usernameInput || !emailInput) {
             showAlert('Form elements not found', 'danger');
             return;
         }
-        
+
         const username = usernameInput.value;
         const email = emailInput.value;
         const fullName = fullNameInput ? fullNameInput.value : '';
@@ -1883,7 +1979,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function uploadProfileImage() {
         const fileInput = document.getElementById('profile-image-upload');
         if (!fileInput || !fileInput.files[0]) return;
-        
+
         const file = fileInput.files[0];
 
         const formData = new FormData();
@@ -1969,7 +2065,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     container.appendChild(notificationElement);
                 }
             });
-            
+
             // Update notification count
             state.notificationCount = notifications.filter(notification => !notification.is_read).length;
             updateAuthUI();
@@ -1981,18 +2077,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // Create notification element
     function createNotificationElement(notification) {
         if (!notification) return null;
-        
+
         const element = document.createElement('div');
         element.className = 'notification-card';
-        
+
         if (!notification.is_read) {
             element.classList.add('unread');
         }
-        
+
         element.dataset.id = notification.notification_id;
-        
+
         const date = new Date(notification.created_at).toLocaleDateString();
-        
+
         element.innerHTML = `
             <div class="notification-content">
                 <div class="notification-title">Item Sold: ${notification.item_title}</div>
@@ -2003,26 +2099,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${!notification.is_read ? `<button class="btn btn-secondary" data-action="markNotificationRead">Mark as Read</button>` : ''}
             </div>
         `;
-        
+
         return element;
     }
 
     // Create purchase element
     function createPurchaseElement(purchase) {
         if (!purchase) return null;
-        
+
         const element = document.createElement('div');
         element.className = 'purchase-card';
-        
+
         // Add class for deleted items
         if (purchase.is_deleted) {
             element.classList.add('item-deleted');
         }
 
         const date = new Date(purchase.purchase_date).toLocaleDateString();
-        
+
         // Add message for deleted items
-        const deletedNotice = purchase.is_deleted ? 
+        const deletedNotice = purchase.is_deleted ?
             '<div class="deleted-notice">(Item no longer listed)</div>' : '';
 
         element.innerHTML = `
@@ -2077,10 +2173,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Create sale element
     function createSaleElement(sale) {
         if (!sale) return null;
-        
+
         const element = document.createElement('div');
         element.className = 'sale-card';
-        
+
         // Add class for deleted items
         if (sale.is_deleted) {
             element.classList.add('item-deleted');
@@ -2148,13 +2244,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // Create alert element
     function createAlertElement(alert) {
         if (!alert) return null;
-        
+
         const element = document.createElement('div');
         element.className = 'alert-card';
+
         if (!alert.is_read) {
             element.classList.add('unread');
         }
+
         element.dataset.id = alert.alert_id;
+
+        // Store the item_id if available for navigation
+        if (alert.item_id) {
+            element.dataset.itemId = alert.item_id;
+            // Add clickable cursor style
+            element.style.cursor = 'pointer';
+        }
 
         let alertTitle = '';
         let alertInfo = '';
@@ -2185,16 +2290,36 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         element.innerHTML = `
-            <div class="alert-content">
-                <div class="alert-title">${alertTitle}</div>
-                <div class="alert-info">${alertInfo}</div>
-                <div class="alert-date">${new Date(alert.created_at).toLocaleString()}</div>
-            </div>
-            <div class="alert-actions">
-                ${!alert.is_read ? `<button class="btn btn-secondary" data-action="markRead">Mark as Read</button>` : ''}
-                <button class="btn btn-danger" data-action="deleteAlert"><i class="fas fa-trash"></i></button>
-            </div>
-        `;
+        <div class="alert-content">
+            <div class="alert-title">${alertTitle}</div>
+            <div class="alert-info">${alertInfo}</div>
+            <div class="alert-date">${new Date(alert.created_at).toLocaleString()}</div>
+        </div>
+        <div class="alert-actions">
+            ${!alert.is_read ? `<button class="btn btn-secondary" data-action="markRead">Mark as Read</button>` : ''}
+            <button class="btn btn-danger" data-action="deleteAlert"><i class="fas fa-trash"></i></button>
+        </div>
+    `;
+
+        // Add click event listener to navigate to item page if item_id exists
+        if (alert.item_id) {
+            element.addEventListener('click', (e) => {
+                // Prevent navigation if the click was on a button
+                if (e.target.tagName === 'BUTTON' ||
+                    e.target.closest('button') ||
+                    e.target.tagName === 'I') {
+                    return;
+                }
+
+                // Navigate to the item page
+                navigateTo('item', { itemId: alert.item_id });
+
+                // Mark the alert as read if it's not already read
+                if (!alert.is_read) {
+                    markAlertAsRead(alert.alert_id);
+                }
+            });
+        }
 
         return element;
     }
@@ -2247,18 +2372,18 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateAlertForm() {
         const alertTypeInput = document.getElementById('alert-type-input');
         if (!alertTypeInput) return;
-        
+
         const alertType = alertTypeInput.value;
         const selectedIndex = alertTypeInput.selectedIndex;
         if (selectedIndex === -1) return;
-        
+
         const alertTypeText = alertTypeInput.options[selectedIndex].text;
 
         // Show/hide fields based on alert type
         const itemGroup = document.getElementById('alert-item-group');
         const categoryGroup = document.getElementById('alert-category-group');
         const priceGroup = document.getElementById('alert-price-group');
-        
+
         if (itemGroup) itemGroup.classList.add('hidden');
         if (categoryGroup) categoryGroup.classList.add('hidden');
         if (priceGroup) priceGroup.classList.add('hidden');
@@ -2360,12 +2485,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (state.user && item.seller_id === state.user.user_id) {
                     return false;
                 }
-                
+
                 // Skip purchased items
                 if (purchasedItemIds.includes(item.item_id)) {
                     return false;
                 }
-                
+
                 return true;
             });
 
@@ -2379,10 +2504,10 @@ document.addEventListener('DOMContentLoaded', () => {
             // If current item is set, select it
             if (state.currentItemId) {
                 // Only select if it's in the options (not purchased)
-                const exists = Array.from(itemInput.options).some(opt => 
+                const exists = Array.from(itemInput.options).some(opt =>
                     opt.value === state.currentItemId.toString()
                 );
-                
+
                 if (exists) {
                     itemInput.value = state.currentItemId;
                 }
@@ -2398,12 +2523,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const itemInput = document.getElementById('alert-item-input');
         const categoryInput = document.getElementById('alert-category-input');
         const priceInput = document.getElementById('alert-price-input');
-        
+
         if (!alertTypeInput) {
             showAlert('Form elements not found', 'danger');
             return;
         }
-        
+
         const alertTypeId = alertTypeInput.value;
         const itemId = itemInput ? itemInput.value : null;
         const categoryId = categoryInput ? categoryInput.value : null;
@@ -2420,7 +2545,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showAlert('Please select a valid alert type', 'warning');
             return;
         }
-        
+
         const alertTypeText = alertTypeInput.options[selectedIndex].text;
 
         switch (alertTypeText) {
@@ -2429,7 +2554,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     showAlert('Please select an item', 'warning');
                     return;
                 }
-                
+
                 if (!priceThreshold || parseFloat(priceThreshold) <= 0) {
                     showAlert('Please enter a valid price threshold', 'warning');
                     return;
@@ -2457,7 +2582,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const item = await apiRequest(`/items/${itemId}`);
                     const currentPrice = parseFloat(item.price);
                     const threshold = parseFloat(priceThreshold);
-                    
+
                     if (threshold >= currentPrice) {
                         showAlert(`Price threshold must be below the current price ($${currentPrice.toFixed(2)})`, 'warning');
                         return;
@@ -2467,7 +2592,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Continue anyway
                 }
             }
-            
+
             await apiRequest('/alerts', 'POST', {
                 alert_type_id: alertTypeId,
                 item_id: itemId || null,
