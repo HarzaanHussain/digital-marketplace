@@ -685,71 +685,92 @@ const clearFieldErrors = formEl => {
 
     // Sell a new item
     async function sellItem() {
-        const titleInput = document.getElementById('item-title-input');
-        const descriptionInput = document.getElementById('item-description-input');
-        const priceInput = document.getElementById('item-price-input');
+        const formEl        = document.getElementById('sell-form');
+        const titleInput    = document.getElementById('item-title-input');
+        const descInput     = document.getElementById('item-description-input');
+        const priceInput    = document.getElementById('item-price-input');
         const categoryInput = document.getElementById('item-category-input');
-        const fileInput = document.getElementById('item-file-input');
-        const thumbnailInput = document.getElementById('item-thumbnail-input');
-
-        if (!titleInput || !priceInput || !categoryInput) {
-            showAlert('Form elements not found', 'danger');
-            return;
-        }
-
-        const title = titleInput.value.trim();
-        const description = descriptionInput ? descriptionInput.value.trim() : '';
-        const price = priceInput.value;
-        const categoryId = categoryInput.value;
-
-        // Validation
+        const fileInput     = document.getElementById('item-file-input');
+        const thumbInput    = document.getElementById('item-thumbnail-input');
+      
+        clearFieldErrors(formEl);
+      
+        const title       = titleInput.value.trim();
+        const description = descInput.value.trim();
+        const price       = priceInput.value;
+        const categoryId  = categoryInput.value;
+      
+        let hasError = false;
+      
+        // Title: required + pattern
         if (!title) {
-            showAlert('Please enter a title', 'warning');
-            return;
+          showFieldError(titleInput, 'Please enter a title');
+          hasError = true;
+        } else if (titleInput.validity.patternMismatch) {
+          // Use the input’s title attribute to show a helpful message
+          showFieldError(titleInput, titleInput.title);
+          hasError = true;
         }
-
-        if (!price || parseFloat(price) <= 0) {
-            showAlert('Please enter a valid price greater than 0', 'warning');
-            return;
+      
+        // Description: required
+        if (!description) {
+          showFieldError(descInput, 'Please enter a description');
+          hasError = true;
         }
-
+      
+        // Price: required + > 0 + respect min attribute
+        if (!price) {
+          showFieldError(priceInput, 'Please enter a price');
+          hasError = true;
+        } else if (parseFloat(price) <= 0) {
+          showFieldError(priceInput, 'Enter a price above $0');
+          hasError = true;
+        } else if (priceInput.validity.rangeUnderflow) {
+          showFieldError(priceInput, `Minimum price is $${priceInput.min}`);
+          hasError = true;
+        }
+      
+        // Category: required
         if (!categoryId) {
-            showAlert('Please select a category', 'warning');
-            return;
+          showFieldError(categoryInput, 'Please select a category');
+          hasError = true;
         }
+      
+                    // ── NEW: File‑size limits ──
+            const MAX_FILE_SIZE   = 50 * 1024 * 1024;  // 50 MB
+            const MAX_THUMB_SIZE  = 5  * 1024 * 1024;  // 5 MB
 
+            if (fileInput.files[0] && fileInput.files[0].size > MAX_FILE_SIZE) {
+                showFieldError(fileInput, 'Main file must be under 50 MB');
+                hasError = true;
+            }
+
+            if (thumbInput.files[0] && thumbInput.files[0].size > MAX_THUMB_SIZE) {
+                showFieldError(thumbInput, 'Thumbnail must be under 5 MB');
+                hasError = true;
+            }
+      
+        // If anything failed, bail out now
+        if (hasError) return;
+      
+        // 4) If you reach here, all fields are valid—proceed as before
         const formData = new FormData();
         formData.append('title', title);
         formData.append('description', description);
         formData.append('price', price);
         formData.append('category_id', categoryId);
-
-        // Only append file if one is selected
-        if (fileInput && fileInput.files[0]) {
-            formData.append('file', fileInput.files[0]);
-        }
-
-        // Only append thumbnail if one is selected
-        if (thumbnailInput && thumbnailInput.files[0]) {
-            formData.append('thumbnail', thumbnailInput.files[0]);
-        }
-
+        if (fileInput.files[0])  formData.append('file', fileInput.files[0]);
+        if (thumbInput.files[0]) formData.append('thumbnail', thumbInput.files[0]);
+      
         try {
-            // Use POST method for new items
-            const item = await apiRequest('/items', 'POST', formData);
-
-            showAlert('Item listed successfully!', 'success');
-
-            // Navigate to item page
-            if (item && item.item_id) {
-                navigateTo('item', { itemId: item.item_id });
-            } else {
-                navigateTo('profile');
-            }
+          const item = await apiRequest('/items', 'POST', formData);
+          showAlert('Item listed successfully!', 'success');
+          navigateTo(item.item_id ? 'item' : 'profile', item.item_id ? { itemId: item.item_id } : {});
         } catch (error) {
-            showAlert('Failed to list item: ' + (error.message || 'Unknown error'), 'danger');
+          showAlert('Failed to list item: ' + error.message, 'danger');
         }
-    }
+      }
+      
 
     // Edit a review
     function editReview(reviewId, reviewElement) {
@@ -1451,7 +1472,7 @@ const clearFieldErrors = formEl => {
             <div class="category-icon">
                 <i class="fas ${icon}"></i>
             </div>
-            <div class="category-name">${category.name}</div>
+            <div class="category-name">${sanitize(category.name)}</div>
         `;
 
         return card;
