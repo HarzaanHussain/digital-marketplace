@@ -9,6 +9,43 @@ document.addEventListener('DOMContentLoaded', () => {
         notificationCount: 0
     };
 
+    
+
+   /* ---------- Sanitation helper utilities ---------- */
+const sanitize = str => {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;           // encoded version
+  };
+  
+ 
+// Injects red text *and* adds a red border to the offending field
+const showFieldError = (el, msg) => {
+    // Remove any old message or error styling
+    const oldMsg = el.nextElementSibling;
+    if (oldMsg?.classList.contains('field-error')) oldMsg.remove();
+    el.classList.remove('error');
+  
+    // Insert the new error message
+    const err = document.createElement('div');
+    err.className = 'field-error';
+    err.textContent = msg;
+    el.after(err);
+  
+    // Add visual cue to the input/select/textarea
+    el.classList.add('error');
+  };
+
+  // Clears all inline messages and red borders from a form
+const clearFieldErrors = formEl => {
+    formEl.querySelectorAll('.field-error').forEach(e => e.remove());
+    formEl.querySelectorAll('.error').forEach(input => input.classList.remove('error'));
+  };
+  
+  /* ------------------------------------------- */
+  
+
+
     // API Base URL
     const API_URL = '/api';
 

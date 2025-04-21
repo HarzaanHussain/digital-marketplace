@@ -1038,3 +1038,13 @@ footer {
         width: 0%;
     }
 }
+  /* Uniform Form Spacing */
+  .modal-content .form-group { margin-bottom: 1.25rem; }
+
+  
+  input.error,
+  textarea.error,
+  select.error {
+    border-color: var(--danger-color);
+    box-shadow: 0 0 0 1px var(--danger-color);
+  }
