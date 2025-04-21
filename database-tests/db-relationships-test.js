@@ -1,3 +1,4 @@
+// db-relationships-test.js - FIXED VERSION
 const mysql = require('mysql2/promise');
 require('dotenv').config();
 
@@ -11,7 +12,11 @@ const EXPECTED_RELATIONSHIPS = [
   { table: 'user_alerts', column: 'user_id', references: { table: 'users', column: 'user_id' } },
   { table: 'user_alerts', column: 'alert_type_id', references: { table: 'alert_types', column: 'alert_type_id' } },
   { table: 'user_alerts', column: 'item_id', references: { table: 'items', column: 'item_id' } },
-  { table: 'user_alerts', column: 'category_id', references: { table: 'categories', column: 'category_id' } }
+  { table: 'user_alerts', column: 'category_id', references: { table: 'categories', column: 'category_id' } },
+  { table: 'seller_notifications', column: 'seller_id', references: { table: 'users', column: 'user_id' } },
+  { table: 'seller_notifications', column: 'item_id', references: { table: 'items', column: 'item_id' } },
+  { table: 'seller_notifications', column: 'buyer_id', references: { table: 'users', column: 'user_id' } },
+  { table: 'seller_notifications', column: 'purchase_id', references: { table: 'purchases', column: 'purchase_id' } }
 ];
 
 async function testForeignKeyRelationships() {
@@ -29,23 +34,26 @@ async function testForeignKeyRelationships() {
     
     const [constraints] = await connection.query(`
       SELECT 
-        table_name,
-        column_name,
-        referenced_table_name,
-        referenced_column_name
-      FROM information_schema.key_column_usage
+        TABLE_NAME as table_name,
+        COLUMN_NAME as column_name,
+        REFERENCED_TABLE_NAME as referenced_table_name,
+        REFERENCED_COLUMN_NAME as referenced_column_name,
+        CONSTRAINT_NAME as constraint_name
+      FROM information_schema.KEY_COLUMN_USAGE
       WHERE 
-        table_schema = ? AND
-        referenced_table_name IS NOT NULL
+        TABLE_SCHEMA = ? AND
+        REFERENCED_TABLE_NAME IS NOT NULL
     `, [process.env.DB_NAME]);
+    
+    console.log(`Found ${constraints.length} foreign key constraints in database`);
     
     // Check that all expected relationships exist
     for (const relationship of EXPECTED_RELATIONSHIPS) {
       const found = constraints.some(c => 
-        c.table_name.toLowerCase() === relationship.table.toLowerCase() &&
-        c.column_name.toLowerCase() === relationship.column.toLowerCase() &&
-        c.referenced_table_name.toLowerCase() === relationship.references.table.toLowerCase() &&
-        c.referenced_column_name.toLowerCase() === relationship.references.column.toLowerCase()
+        String(c.table_name).toLowerCase() === relationship.table.toLowerCase() &&
+        String(c.column_name).toLowerCase() === relationship.column.toLowerCase() &&
+        String(c.referenced_table_name).toLowerCase() === relationship.references.table.toLowerCase() &&
+        String(c.referenced_column_name).toLowerCase() === relationship.references.column.toLowerCase()
       );
       
       if (found) {
@@ -68,6 +76,20 @@ async function testForeignKeyRelationships() {
       }
     }
     
+    // Check for any extra relationships that weren't expected
+    for (const constraint of constraints) {
+      const isExpected = EXPECTED_RELATIONSHIPS.some(r => 
+        r.table.toLowerCase() === String(constraint.table_name).toLowerCase() &&
+        r.column.toLowerCase() === String(constraint.column_name).toLowerCase() &&
+        r.references.table.toLowerCase() === String(constraint.referenced_table_name).toLowerCase() &&
+        r.references.column.toLowerCase() === String(constraint.referenced_column_name).toLowerCase()
+      );
+      
+      if (!isExpected) {
+        console.log(`ℹ️ Extra relationship: ${constraint.table_name}.${constraint.column_name} -> ${constraint.referenced_table_name}.${constraint.referenced_column_name} (${constraint.constraint_name})`);
+      }
+    }
+    
     console.log('🎉 Foreign key relationship testing complete!');
     return true;
   } catch (error) {
@@ -81,7 +103,8 @@ async function testForeignKeyRelationships() {
 // Run the test
 testForeignKeyRelationships()
   .then(success => {
-    if (!success) process.exit(1);
+    console.log(`Test completed with ${success ? 'success' : 'failure'}`);
+    process.exit(success ? 0 : 1);
   })
   .catch(err => {
     console.error('Test failed with error:', err);
