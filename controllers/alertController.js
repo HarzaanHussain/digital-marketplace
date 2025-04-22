@@ -132,12 +132,11 @@ const createAlert = async (req, res) => {
 // @access  Private
 const getUserAlerts = async (req, res) => {
   try {
-    // Add pagination
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
     
-    // Only get active alerts (exclude those with items that have been deleted)
+    // Get all alerts including monitoring and notification alerts
     const [rows] = await pool.query(
       `SELECT ua.*, at.name as alert_type_name, 
               i.title as item_title, i.price as item_price, i.thumbnail_path as item_thumbnail,
@@ -148,18 +147,19 @@ const getUserAlerts = async (req, res) => {
        LEFT JOIN categories c ON ua.category_id = c.category_id
        WHERE ua.user_id = ?
          AND (i.is_deleted IS NULL OR i.is_deleted = false)
-       ORDER BY ua.created_at DESC
+         AND (ua.alert_details != 'Monitoring active' OR ua.is_read = false)
+       ORDER BY ua.is_read ASC, ua.created_at DESC
        LIMIT ? OFFSET ?`,
       [req.user.user_id, limit, offset]
     );
     
-    // Get total count separately - avoid mixing aggregate and non-aggregate columns
     const [countResult] = await pool.query(
       `SELECT COUNT(*) as total
        FROM user_alerts ua
        LEFT JOIN items i ON ua.item_id = i.item_id
        WHERE ua.user_id = ?
-         AND (i.is_deleted IS NULL OR i.is_deleted = false)`,
+         AND (i.is_deleted IS NULL OR i.is_deleted = false)
+         AND (ua.alert_details != 'Monitoring active' OR ua.is_read = false)`,
       [req.user.user_id]
     );
     
