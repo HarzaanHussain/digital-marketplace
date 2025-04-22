@@ -27,7 +27,7 @@ const createAlert = async (req, res) => {
     
     const alertType = alertTypeRows[0];
     
-    // For Price Drop alerts
+    // Specifically for Price Drop alerts
     if (alertType.name === 'Price Drop') {
       if (!item_id) {
         await pool.query('ROLLBACK');
@@ -68,16 +68,8 @@ const createAlert = async (req, res) => {
       }
     }
     
-    // For New Item alerts
-    if (alertType.name === 'New Item') {
-      if (!category_id) {
-        await pool.query('ROLLBACK');
-        return res.status(400).json({ message: 'Category is required for New Item alerts' });
-      }
-    }
-    
     // Check for existing similar alerts
-    let duplicateCheckQuery = 'SELECT * FROM user_alerts WHERE user_id = ? AND alert_type_id = ? AND is_read = false';
+    let duplicateCheckQuery = 'SELECT * FROM user_alerts WHERE user_id = ? AND alert_type_id = ?';
     const duplicateCheckParams = [req.user.user_id, alert_type_id];
     
     if (item_id) {
@@ -101,10 +93,10 @@ const createAlert = async (req, res) => {
       return res.status(400).json({ message: 'You already have this alert set' });
     }
     
-    // Create the monitoring alert (NOT a notification)
+    // Insert monitoring alert - mark as read by default and set monitoring status
     const [result] = await pool.query(
       'INSERT INTO user_alerts (user_id, alert_type_id, item_id, category_id, price_threshold, is_read, alert_details) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [req.user.user_id, alert_type_id, item_id || null, category_id || null, price_threshold || null, true, 'Monitoring active']
+      [req.user.user_id, alert_type_id, item_id || null, category_id || null, price_threshold || null, true, 'MONITORING']
     );
     
     if (result.affectedRows !== 1) {
@@ -136,7 +128,7 @@ const getUserAlerts = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
     
-    // Get all alerts including monitoring and notification alerts
+    // Get all alerts (both monitoring and notifications)
     const [rows] = await pool.query(
       `SELECT ua.*, at.name as alert_type_name, 
               i.title as item_title, i.price as item_price, i.thumbnail_path as item_thumbnail,
@@ -147,7 +139,6 @@ const getUserAlerts = async (req, res) => {
        LEFT JOIN categories c ON ua.category_id = c.category_id
        WHERE ua.user_id = ?
          AND (i.is_deleted IS NULL OR i.is_deleted = false)
-         AND (ua.alert_details != 'Monitoring active' OR ua.is_read = false)
        ORDER BY ua.is_read ASC, ua.created_at DESC
        LIMIT ? OFFSET ?`,
       [req.user.user_id, limit, offset]
@@ -158,8 +149,7 @@ const getUserAlerts = async (req, res) => {
        FROM user_alerts ua
        LEFT JOIN items i ON ua.item_id = i.item_id
        WHERE ua.user_id = ?
-         AND (i.is_deleted IS NULL OR i.is_deleted = false)
-         AND (ua.alert_details != 'Monitoring active' OR ua.is_read = false)`,
+         AND (i.is_deleted IS NULL OR i.is_deleted = false)`,
       [req.user.user_id]
     );
     

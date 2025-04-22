@@ -6,17 +6,19 @@ const { v4: uuidv4 } = require('uuid');
 // Helper function to check for alerts when a new item is created
 const checkNewItemAlerts = async (itemId, categoryId, sellerId) => {
   try {
-    // Find users who have alerts for this category, EXCLUDING the seller
+    // Find monitoring alerts for this category
     const [alerts] = await pool.query(
-      `SELECT ua.alert_id, ua.user_id, ua.alert_type_id, ua.category_id, at.name as alert_type_name
+      `SELECT ua.user_id, ua.alert_type_id, ua.category_id
        FROM user_alerts ua
        JOIN alert_types at ON ua.alert_type_id = at.alert_type_id
-       WHERE ua.category_id = ? AND at.name = 'New Item' AND ua.user_id != ?
-       AND ua.alert_details = 'Monitoring active'`,
+       WHERE ua.category_id = ? 
+       AND at.name = 'New Item' 
+       AND ua.user_id != ?
+       AND ua.alert_details = 'MONITORING'`,
       [categoryId, sellerId]
     );
     
-    // Get item and category details
+    // Get item details for notification
     const [itemDetails] = await pool.query(
       `SELECT i.*, c.name as category_name 
        FROM items i 
@@ -30,7 +32,7 @@ const checkNewItemAlerts = async (itemId, categoryId, sellerId) => {
     
     // Create notification alerts for matching users
     for (const alert of alerts) {
-      const alertDetails = `New ${item.category_name} item: "${item.title}" - $${parseFloat(item.price).toFixed(2)}`;
+      const alertDetails = `New item in ${item.category_name}: "${item.title}" - Price: $${parseFloat(item.price).toFixed(2)}`;
       
       await pool.query(
         `INSERT INTO user_alerts (user_id, alert_type_id, item_id, category_id, is_read, alert_details)
@@ -44,19 +46,21 @@ const checkNewItemAlerts = async (itemId, categoryId, sellerId) => {
 };
 
 // Helper function to check for price drop alerts
-const checkPriceDropAlerts = async (itemId, newPrice, oldPrice, sellerId) => {
+const checkPriceDropAlerts = async (itemId, newPrice, sellerId) => {
   try {
-    // Find users who have price drop alerts for this item, EXCLUDING the seller
+    // Find monitoring alerts for this item
     const [alerts] = await pool.query(
-      `SELECT ua.alert_id, ua.user_id, ua.alert_type_id, ua.price_threshold
+      `SELECT ua.user_id, ua.alert_type_id, ua.price_threshold
        FROM user_alerts ua
        JOIN alert_types at ON ua.alert_type_id = at.alert_type_id
-       WHERE ua.item_id = ? AND at.name = 'Price Drop' AND ua.user_id != ?
-       AND ua.alert_details = 'Monitoring active'`,
+       WHERE ua.item_id = ? 
+       AND at.name = 'Price Drop' 
+       AND ua.user_id != ?
+       AND ua.alert_details = 'MONITORING'`,
       [itemId, sellerId]
     );
     
-    // Get item details
+    // Get item details for notification
     const [itemDetails] = await pool.query(
       'SELECT * FROM items WHERE item_id = ?',
       [itemId]
@@ -65,10 +69,10 @@ const checkPriceDropAlerts = async (itemId, newPrice, oldPrice, sellerId) => {
     if (itemDetails.length === 0) return;
     const item = itemDetails[0];
     
-    // Create alerts for users where the new price meets their threshold
+    // Create notification alerts for users where the new price meets their threshold
     for (const alert of alerts) {
       if (alert.price_threshold && parseFloat(newPrice) <= parseFloat(alert.price_threshold)) {
-        const alertDetails = `Price dropped for "${item.title}" from $${parseFloat(oldPrice).toFixed(2)} to $${parseFloat(newPrice).toFixed(2)} (Threshold: $${parseFloat(alert.price_threshold).toFixed(2)})`;
+        const alertDetails = `Price drop! "${item.title}" now costs $${parseFloat(newPrice).toFixed(2)} (Your threshold: $${parseFloat(alert.price_threshold).toFixed(2)})`;
         
         await pool.query(
           `INSERT INTO user_alerts (user_id, alert_type_id, item_id, is_read, price_threshold, alert_details)

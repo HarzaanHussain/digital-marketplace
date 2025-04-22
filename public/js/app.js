@@ -1356,12 +1356,16 @@ const clearFieldErrors = formEl => {
     // Check for unread alerts
     async function checkForAlerts() {
         if (!state.user) return;
-
+    
         try {
             const alertsResponse = await apiRequest('/alerts');
             const alerts = alertsResponse.alerts || alertsResponse;
-            const unreadCount = alerts.filter(alert => !alert.is_read).length;
-
+            
+            // Count only unread notification alerts (not monitoring alerts)
+            const unreadCount = alerts.filter(alert => 
+                !alert.is_read && alert.alert_details !== 'MONITORING'
+            ).length;
+    
             state.alertCount = unreadCount;
             updateAuthUI();
         } catch (error) {
@@ -2327,28 +2331,29 @@ const clearFieldErrors = formEl => {
         let alertTitle = '';
         let alertInfo = '';
     
-        // Use detailed alert info if available
-        if (alert.alert_details && alert.alert_details !== 'Monitoring active') {
-            alertTitle = alert.alert_type_name + ' Alert';
-            alertInfo = alert.alert_details;
-        } else {
-            // Fallback to old display logic
+        // Check if this is a monitoring alert or a notification
+        if (alert.alert_details === 'MONITORING') {
+            // This is a monitoring alert
             switch (alert.alert_type_name) {
                 case 'Price Drop':
-                    alertTitle = 'Price Drop Alert';
+                    alertTitle = 'Price Drop Monitor';
                     alertInfo = `Monitoring price drops for ${alert.item_title || 'an item'}`;
                     if (alert.price_threshold) {
                         alertInfo += ` (threshold: $${parseFloat(alert.price_threshold).toFixed(2)})`;
                     }
                     break;
                 case 'New Item':
-                    alertTitle = 'New Item Alert';
+                    alertTitle = 'New Item Monitor';
                     alertInfo = `Monitoring new items in ${alert.category_name || 'a category'}`;
                     break;
                 default:
-                    alertTitle = 'Alert';
+                    alertTitle = 'Alert Monitor';
                     alertInfo = 'Monitoring active';
             }
+        } else {
+            // This is a notification alert
+            alertTitle = alert.alert_type_name + ' Alert';
+            alertInfo = alert.alert_details || 'You have a new alert';
         }
     
         element.innerHTML = `
@@ -2358,32 +2363,27 @@ const clearFieldErrors = formEl => {
                 <div class="alert-date">${new Date(alert.created_at).toLocaleString()}</div>
             </div>
             <div class="alert-actions">
-                ${!alert.is_read && alert.alert_details !== 'Monitoring active' ? 
+                ${!alert.is_read && alert.alert_details !== 'MONITORING' ? 
                     `<button class="btn btn-secondary" data-action="markRead">Mark as Read</button>` : ''}
                 <button class="btn btn-danger" data-action="deleteAlert"><i class="fas fa-trash"></i></button>
             </div>
         `;
-
+    
         // Add click event listener to navigate to item page if item_id exists
-        if (alert.item_id) {
+        if (alert.item_id && alert.alert_details !== 'MONITORING') {
             element.addEventListener('click', (e) => {
-                // Prevent navigation if the click was on a button
-                if (e.target.tagName === 'BUTTON' ||
-                    e.target.closest('button') ||
+                if (e.target.tagName === 'BUTTON' || 
+                    e.target.closest('button') || 
                     e.target.tagName === 'I') {
                     return;
                 }
-
-                // Navigate to the item page
                 navigateTo('item', { itemId: alert.item_id });
-
-                // Mark the alert as read if it's not already read
                 if (!alert.is_read) {
                     markAlertAsRead(alert.alert_id);
                 }
             });
         }
-
+    
         return element;
     }
 
