@@ -7,7 +7,6 @@ yarn-error.log
 .env
 
 # Uploads directory
-public/uploads/
 
 # OS specific files
 .DS_Store
