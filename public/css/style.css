@@ -1038,3 +1038,66 @@ footer {
         width: 0%;
     }
 }
+  /* Uniform Form Spacing */
+  .modal-content .form-group { margin-bottom: 1.25rem; }
+
+  
+  input.error,
+  textarea.error,
+  select.error {
+    border-color: var(--danger-color);
+    box-shadow: 0 0 0 1px var(--danger-color);
+  }
+
+  /* Sell Form layout & controls */
+.sell-form {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 1rem;
+  }
+  
+  .form-row.two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  
+  @media (max-width: 600px) {
+    .form-row.two-col {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  /* Ensure form‑control matches our inputs */
+  .form-control {
+    display: block;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    color: #495057;
+    background-color: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    transition: border-color 0.15s;
+  }
+  
+  .form-control:focus {
+    outline: none;
+    border-color: var(--primary-color);
+  }
+  
+  /* Error highlighting (inputs already get .error in your JS) */
+  input.error,
+  textarea.error,
+  select.error {
+    border-color: var(--danger-color);
+    box-shadow: 0 0 0 1px var(--danger-color) inset;
+  }
+  
+  .field-error {
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    color: var(--danger-color);
+  }
+  
