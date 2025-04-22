@@ -44,24 +44,36 @@ const checkNewItemAlerts = async (itemId, categoryId, sellerId) => {
 };
 
 // Helper function to check for price drop alerts
-const checkPriceDropAlerts = async (itemId, newPrice, sellerId) => {
+const checkPriceDropAlerts = async (itemId, newPrice, oldPrice, sellerId) => {
   try {
     // Find users who have price drop alerts for this item, EXCLUDING the seller
     const [alerts] = await pool.query(
       `SELECT ua.alert_id, ua.user_id, ua.alert_type_id, ua.price_threshold
        FROM user_alerts ua
        JOIN alert_types at ON ua.alert_type_id = at.alert_type_id
-       WHERE ua.item_id = ? AND at.name = 'Price Drop' AND ua.user_id != ?`,
+       WHERE ua.item_id = ? AND at.name = 'Price Drop' AND ua.user_id != ?
+       AND ua.alert_details = 'Monitoring active'`,
       [itemId, sellerId]
     );
     
-    // Create alerts ONLY for users where the new price is STRICTLY LESS than their threshold
+    // Get item details
+    const [itemDetails] = await pool.query(
+      'SELECT * FROM items WHERE item_id = ?',
+      [itemId]
+    );
+    
+    if (itemDetails.length === 0) return;
+    const item = itemDetails[0];
+    
+    // Create alerts for users where the new price meets their threshold
     for (const alert of alerts) {
       if (alert.price_threshold && parseFloat(newPrice) <= parseFloat(alert.price_threshold)) {
+        const alertDetails = `Price dropped for "${item.title}" from $${parseFloat(oldPrice).toFixed(2)} to $${parseFloat(newPrice).toFixed(2)} (Threshold: $${parseFloat(alert.price_threshold).toFixed(2)})`;
+        
         await pool.query(
-          `INSERT INTO user_alerts (user_id, alert_type_id, item_id, is_read, price_threshold)
-           VALUES (?, ?, ?, ?, ?)`,
-          [alert.user_id, alert.alert_type_id, itemId, false, alert.price_threshold]
+          `INSERT INTO user_alerts (user_id, alert_type_id, item_id, is_read, price_threshold, alert_details)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [alert.user_id, alert.alert_type_id, itemId, false, alert.price_threshold, alertDetails]
         );
       }
     }
