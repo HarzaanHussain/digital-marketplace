@@ -14,7 +14,7 @@ const createAlert = async (req, res) => {
       return res.status(400).json({ message: 'Please provide an alert type' });
     }
     
-    // Verify alert type exists and is a Price Drop alert
+    // Verify alert type exists
     const [alertTypeRows] = await pool.query(
       'SELECT * FROM alert_types WHERE alert_type_id = ?',
       [alert_type_id]
@@ -27,9 +27,8 @@ const createAlert = async (req, res) => {
     
     const alertType = alertTypeRows[0];
     
-    // Specifically for Price Drop alerts
+    // For Price Drop alerts
     if (alertType.name === 'Price Drop') {
-      // Require an item for price drop alerts
       if (!item_id) {
         await pool.query('ROLLBACK');
         return res.status(400).json({ message: 'Item is required for Price Drop alerts' });
@@ -69,8 +68,16 @@ const createAlert = async (req, res) => {
       }
     }
     
+    // For New Item alerts
+    if (alertType.name === 'New Item') {
+      if (!category_id) {
+        await pool.query('ROLLBACK');
+        return res.status(400).json({ message: 'Category is required for New Item alerts' });
+      }
+    }
+    
     // Check for existing similar alerts
-    let duplicateCheckQuery = 'SELECT * FROM user_alerts WHERE user_id = ? AND alert_type_id = ?';
+    let duplicateCheckQuery = 'SELECT * FROM user_alerts WHERE user_id = ? AND alert_type_id = ? AND is_read = false';
     const duplicateCheckParams = [req.user.user_id, alert_type_id];
     
     if (item_id) {
@@ -94,10 +101,10 @@ const createAlert = async (req, res) => {
       return res.status(400).json({ message: 'You already have this alert set' });
     }
     
-    // Insert alert into database
+    // Create the monitoring alert (NOT a notification)
     const [result] = await pool.query(
-      'INSERT INTO user_alerts (user_id, alert_type_id, item_id, category_id, price_threshold) VALUES (?, ?, ?, ?, ?)',
-      [req.user.user_id, alert_type_id, item_id || null, category_id || null, price_threshold || null]
+      'INSERT INTO user_alerts (user_id, alert_type_id, item_id, category_id, price_threshold, is_read, alert_details) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [req.user.user_id, alert_type_id, item_id || null, category_id || null, price_threshold || null, true, 'Monitoring active']
     );
     
     if (result.affectedRows !== 1) {
