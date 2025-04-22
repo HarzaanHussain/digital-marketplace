@@ -11,25 +11,31 @@ const checkNewItemAlerts = async (itemId, categoryId, sellerId) => {
       `SELECT ua.alert_id, ua.user_id, ua.alert_type_id, ua.category_id, at.name as alert_type_name
        FROM user_alerts ua
        JOIN alert_types at ON ua.alert_type_id = at.alert_type_id
-       WHERE ua.category_id = ? AND at.name = 'New Item' AND ua.user_id != ?`,
+       WHERE ua.category_id = ? AND at.name = 'New Item' AND ua.user_id != ?
+       AND ua.alert_details = 'Monitoring active'`,
       [categoryId, sellerId]
     );
     
-    // Get item details
+    // Get item and category details
     const [itemDetails] = await pool.query(
-      'SELECT * FROM items WHERE item_id = ?',
+      `SELECT i.*, c.name as category_name 
+       FROM items i 
+       JOIN categories c ON i.category_id = c.category_id 
+       WHERE i.item_id = ?`,
       [itemId]
     );
     
     if (itemDetails.length === 0) return;
     const item = itemDetails[0];
     
-    // Create alerts for matching users
+    // Create notification alerts for matching users
     for (const alert of alerts) {
+      const alertDetails = `New ${item.category_name} item: "${item.title}" - $${parseFloat(item.price).toFixed(2)}`;
+      
       await pool.query(
-        `INSERT INTO user_alerts (user_id, alert_type_id, item_id, category_id, is_read)
-         VALUES (?, ?, ?, ?, ?)`,
-        [alert.user_id, alert.alert_type_id, itemId, categoryId, false]
+        `INSERT INTO user_alerts (user_id, alert_type_id, item_id, category_id, is_read, alert_details)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [alert.user_id, alert.alert_type_id, itemId, categoryId, false, alertDetails]
       );
     }
   } catch (error) {
