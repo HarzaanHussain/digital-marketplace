@@ -2270,29 +2270,36 @@ const clearFieldErrors = formEl => {
     async function loadAlerts() {
         const container = document.getElementById('alerts-container');
         if (!container) return;
-
+    
         container.innerHTML = '<div class="loading">Loading...</div>';
-
+    
         try {
             const alertsResponse = await apiRequest('/alerts');
             const alerts = alertsResponse.alerts || alertsResponse;
-
-            if (!alerts || alerts.length === 0) {
-                container.innerHTML = '<p class="no-alerts">No alerts set</p>';
+    
+            // Filter out monitoring alerts with no actual notifications
+            const displayAlerts = alerts.filter(alert => 
+                alert.alert_details !== 'Monitoring active' || !alert.is_read
+            );
+    
+            if (!displayAlerts || displayAlerts.length === 0) {
+                container.innerHTML = '<p class="no-alerts">No alerts to display</p>';
                 return;
             }
-
+    
             container.innerHTML = '';
-
-            alerts.forEach(alert => {
+    
+            displayAlerts.forEach(alert => {
                 const alertElement = createAlertElement(alert);
                 if (alertElement) {
                     container.appendChild(alertElement);
                 }
             });
-
-            // Update alert count
-            state.alertCount = alerts.filter(alert => !alert.is_read).length;
+    
+            // Update alert count (only count unread notification alerts)
+            state.alertCount = displayAlerts.filter(alert => 
+                !alert.is_read && alert.alert_details !== 'Monitoring active'
+            ).length;
             updateAuthUI();
         } catch (error) {
             container.innerHTML = '<p class="error">Failed to load alerts</p>';
@@ -2302,62 +2309,60 @@ const clearFieldErrors = formEl => {
     // Create alert element
     function createAlertElement(alert) {
         if (!alert) return null;
-
+    
         const element = document.createElement('div');
         element.className = 'alert-card';
-
+    
         if (!alert.is_read) {
             element.classList.add('unread');
         }
-
+    
         element.dataset.id = alert.alert_id;
-
-        // Store the item_id if available for navigation
+    
         if (alert.item_id) {
             element.dataset.itemId = alert.item_id;
-            // Add clickable cursor style
             element.style.cursor = 'pointer';
         }
-
+    
         let alertTitle = '';
         let alertInfo = '';
-
-        switch (alert.alert_type_name) {
-            case 'Price Drop':
-                alertTitle = 'Price Drop Alert';
-                alertInfo = `Price dropped for ${alert.item_title || 'an item'}`;
-                if (alert.price_threshold) {
-                    alertInfo += ` (threshold: $${parseFloat(alert.price_threshold).toFixed(2)})`;
-                }
-                break;
-            case 'New Item':
-                alertTitle = 'New Item Alert';
-                alertInfo = `New item in ${alert.category_name || 'a category'}`;
-                break;
-            case 'Back in Stock':
-                alertTitle = 'Back in Stock Alert';
-                alertInfo = `${alert.item_title || 'An item'} is back in stock`;
-                break;
-            case 'Seller Update':
-                alertTitle = 'Seller Update Alert';
-                alertInfo = `Update from seller for ${alert.item_title || 'an item'}`;
-                break;
-            default:
-                alertTitle = 'Alert';
-                alertInfo = 'You have a new alert';
+    
+        // Use detailed alert info if available
+        if (alert.alert_details && alert.alert_details !== 'Monitoring active') {
+            alertTitle = alert.alert_type_name + ' Alert';
+            alertInfo = alert.alert_details;
+        } else {
+            // Fallback to old display logic
+            switch (alert.alert_type_name) {
+                case 'Price Drop':
+                    alertTitle = 'Price Drop Alert';
+                    alertInfo = `Monitoring price drops for ${alert.item_title || 'an item'}`;
+                    if (alert.price_threshold) {
+                        alertInfo += ` (threshold: $${parseFloat(alert.price_threshold).toFixed(2)})`;
+                    }
+                    break;
+                case 'New Item':
+                    alertTitle = 'New Item Alert';
+                    alertInfo = `Monitoring new items in ${alert.category_name || 'a category'}`;
+                    break;
+                default:
+                    alertTitle = 'Alert';
+                    alertInfo = 'Monitoring active';
+            }
         }
-
+    
         element.innerHTML = `
-        <div class="alert-content">
-            <div class="alert-title">${alertTitle}</div>
-            <div class="alert-info">${alertInfo}</div>
-            <div class="alert-date">${new Date(alert.created_at).toLocaleString()}</div>
-        </div>
-        <div class="alert-actions">
-            ${!alert.is_read ? `<button class="btn btn-secondary" data-action="markRead">Mark as Read</button>` : ''}
-            <button class="btn btn-danger" data-action="deleteAlert"><i class="fas fa-trash"></i></button>
-        </div>
-    `;
+            <div class="alert-content">
+                <div class="alert-title">${alertTitle}</div>
+                <div class="alert-info">${alertInfo}</div>
+                <div class="alert-date">${new Date(alert.created_at).toLocaleString()}</div>
+            </div>
+            <div class="alert-actions">
+                ${!alert.is_read && alert.alert_details !== 'Monitoring active' ? 
+                    `<button class="btn btn-secondary" data-action="markRead">Mark as Read</button>` : ''}
+                <button class="btn btn-danger" data-action="deleteAlert"><i class="fas fa-trash"></i></button>
+            </div>
+        `;
 
         // Add click event listener to navigate to item page if item_id exists
         if (alert.item_id) {
