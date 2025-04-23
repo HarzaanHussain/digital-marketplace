@@ -15,7 +15,7 @@
   --elev-1: 0 2px 5px rgba(0,0,0,.08);
   --elev-2: 0 6px 12px rgba(0,0,0,.12);
 
-  --primary-color-hover: #3a5a8a;   /* same hue, 15 % darker */
+  --primary-color-hover: #3a5a8a;   /* same hue, 15 % darker over hover */
 }
 
 * {
@@ -24,7 +24,7 @@
     padding: 0;
 }
 
-/* around line 10 of style.css */
+/* Font Style */
 body {
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
@@ -239,6 +239,8 @@ main {
     background-color: #c82333;
     border-color: #bd2130;
 }
+
+
 
 /* Forms */
 .form-group {
@@ -1076,7 +1078,7 @@ footer {
     }
   }
   
-  /* Ensure form‑control matches our inputs */
+  /* Ensure form‑control matches inputs */
   .form-control {
     display: block;
     width: 100%;
@@ -1095,7 +1097,7 @@ footer {
     border-color: var(--primary-color);
   }
   
-  /* Error highlighting (inputs already get .error in your JS) */
+  /* Error highlighting */
   input.error,
   textarea.error,
   select.error {
@@ -1109,3 +1111,9 @@ footer {
     color: var(--danger-color);
   }
   
+  header.scrolled {
+    background: rgba(255,255,255,.8);
+    backdrop-filter: blur(6px);
+    box-shadow: var(--elev-1);
+    transition: background .3s, box-shadow .3s;
+  }
