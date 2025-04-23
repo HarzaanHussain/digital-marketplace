@@ -1117,3 +1117,6 @@ footer {
     box-shadow: var(--elev-1);
     transition: background .3s, box-shadow .3s;
   }
+
+
+  .section { margin-block: 3rem; }     /* ∼48 px space top & bottom */
