@@ -8,6 +8,14 @@
     --danger-color: #dc3545;
     --warning-color: #ffc107;
     --info-color: #17a2b8;
+
+      /* --- NEW tokens --- */
+  --radius-md: .5rem;
+  --radius-lg: .75rem;
+  --elev-1: 0 2px 5px rgba(0,0,0,.08);
+  --elev-2: 0 6px 12px rgba(0,0,0,.12);
+
+  --primary-color-hover: #3a5a8a;   /* same hue, 15 % darker */
 }
 
 * {
