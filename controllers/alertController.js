@@ -42,7 +42,7 @@ const createAlert = async (req, res) => {
       
       if (itemRows.length === 0) {
         await pool.query('ROLLBACK');
-        return res.status(400).json({ message: 'Item not found or no longer available' });
+        return res.status(404).json({ message: 'Item not found or no longer available' });
       }
       
       const item = itemRows[0];
@@ -84,6 +84,12 @@ const createAlert = async (req, res) => {
       duplicateCheckParams.push(category_id);
     } else {
       duplicateCheckQuery += ' AND category_id IS NULL';
+    }
+    
+    // For price drop alerts, also check the threshold in duplicate checking
+    if (alertType.name === 'Price Drop' && price_threshold) {
+      duplicateCheckQuery += ' AND price_threshold = ?';
+      duplicateCheckParams.push(price_threshold);
     }
     
     const [duplicateAlerts] = await pool.query(duplicateCheckQuery, duplicateCheckParams);

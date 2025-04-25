@@ -57,7 +57,7 @@ const createPurchase = async (req, res) => {
       return res.status(400).json({ message: 'Failed to create purchase' });
     }
     
-    // Create notification for seller
+    // Create notification for seller - only once within the transaction
     try {
       // Check if seller_notifications table exists first
       const [tableCheck] = await pool.query(`
@@ -68,10 +68,18 @@ const createPurchase = async (req, res) => {
       `);
       
       if (tableCheck[0].table_exists > 0) {
-        await pool.query(
-          'INSERT INTO seller_notifications (seller_id, item_id, buyer_id, purchase_id) VALUES (?, ?, ?, ?)',
+        // Check if a notification already exists for this purchase to avoid duplicates
+        const [existingNotification] = await pool.query(
+          'SELECT * FROM seller_notifications WHERE seller_id = ? AND item_id = ? AND buyer_id = ? AND purchase_id = ?',
           [item.seller_id, item_id, req.user.user_id, result.insertId]
         );
+        
+        if (existingNotification.length === 0) {
+          await pool.query(
+            'INSERT INTO seller_notifications (seller_id, item_id, buyer_id, purchase_id) VALUES (?, ?, ?, ?)',
+            [item.seller_id, item_id, req.user.user_id, result.insertId]
+          );
+        }
       }
     } catch (notificationError) {
       // Log but don't fail the purchase if notification can't be created
@@ -263,18 +271,20 @@ const downloadPurchasedItem = async (req, res) => {
       return res.download(defaultFilePath, fileName);
     }
     
-    // First check if this is a full path or a relative path
+    // Improved file path handling
     let filePath;
+    
+    // Case 1: Absolute path
     if (path.isAbsolute(purchase.file_path)) {
       filePath = purchase.file_path;
-    } else {
-      // If it starts with a slash, remove it
-      const relativePath = purchase.file_path.startsWith('/') 
-        ? purchase.file_path.substring(1) 
-        : purchase.file_path;
-        
-      // Join with the public directory path
-      filePath = path.join(__dirname, '..', 'public', relativePath);
+    } 
+    // Case 2: Relative path starting with /
+    else if (purchase.file_path.startsWith('/')) {
+      filePath = path.join(__dirname, '..', 'public', purchase.file_path.substring(1));
+    } 
+    // Case 3: Relative path without /
+    else {
+      filePath = path.join(__dirname, '..', 'public', purchase.file_path);
     }
     
     console.log('Resolved file path:', filePath);
@@ -283,14 +293,27 @@ const downloadPurchasedItem = async (req, res) => {
     if (!fs.existsSync(filePath)) {
       console.error(`File not found at resolved path: ${filePath}`);
       
-      // Try one more time with the raw path
-      const alternatePath = path.join(__dirname, '..', 'public', purchase.file_path);
-      console.log('Trying alternate path:', alternatePath);
+      // Try alternative path resolutions
+      const alternativePaths = [
+        path.join(__dirname, '..', 'public', purchase.file_path),
+        path.join(__dirname, '..', purchase.file_path),
+        path.join(__dirname, '..', 'public', purchase.file_path.replace(/^\/+/, '')),
+        path.join(__dirname, '..', 'public/uploads/items', path.basename(purchase.file_path))
+      ];
       
-      if (fs.existsSync(alternatePath)) {
-        filePath = alternatePath;
-        console.log('Found file at alternate path');
-      } else {
+      let fileFound = false;
+      
+      for (const altPath of alternativePaths) {
+        console.log('Trying alternative path:', altPath);
+        if (fs.existsSync(altPath)) {
+          filePath = altPath;
+          fileFound = true;
+          console.log('Found file at alternative path');
+          break;
+        }
+      }
+      
+      if (!fileFound) {
         console.log('File still not found, serving default file');
         
         // Return a default file if the actual file is missing

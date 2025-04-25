@@ -9,41 +9,41 @@ document.addEventListener('DOMContentLoaded', () => {
         notificationCount: 0
     };
 
-    
 
-   /* ---------- Sanitation helper utilities ---------- */
-const sanitize = str => {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;           // encoded version
-  };
-  
- 
-// Injects red text *and* adds a red border to the offending field
-const showFieldError = (el, msg) => {
-    // Remove any old message or error styling
-    const oldMsg = el.nextElementSibling;
-    if (oldMsg?.classList.contains('field-error')) oldMsg.remove();
-    el.classList.remove('error');
-  
-    // Insert the new error message
-    const err = document.createElement('div');
-    err.className = 'field-error';
-    err.textContent = msg;
-    el.after(err);
-  
-    // Add visual cue to the input/select/textarea
-    el.classList.add('error');
-  };
 
-  // Clears all inline messages and red borders from a form
-const clearFieldErrors = formEl => {
-    formEl.querySelectorAll('.field-error').forEach(e => e.remove());
-    formEl.querySelectorAll('.error').forEach(input => input.classList.remove('error'));
-  };
-  
-  /* ------------------------------------------- */
-  
+    /* ---------- Sanitation helper utilities ---------- */
+    const sanitize = str => {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;           // encoded version
+    };
+
+
+    // Injects red text *and* adds a red border to the offending field
+    const showFieldError = (el, msg) => {
+        // Remove any old message or error styling
+        const oldMsg = el.nextElementSibling;
+        if (oldMsg?.classList.contains('field-error')) oldMsg.remove();
+        el.classList.remove('error');
+
+        // Insert the new error message
+        const err = document.createElement('div');
+        err.className = 'field-error';
+        err.textContent = msg;
+        el.after(err);
+
+        // Add visual cue to the input/select/textarea
+        el.classList.add('error');
+    };
+
+    // Clears all inline messages and red borders from a form
+    const clearFieldErrors = formEl => {
+        formEl.querySelectorAll('.field-error').forEach(e => e.remove());
+        formEl.querySelectorAll('.error').forEach(input => input.classList.remove('error'));
+    };
+
+    /* ------------------------------------------- */
+
 
 
     // API Base URL
@@ -545,17 +545,17 @@ const clearFieldErrors = formEl => {
                 dialog.id = 'price-edit-dialog';
                 dialog.className = 'modal';
                 dialog.innerHTML = `
-                    <div class="modal-content">
-                        <span class="close-button">&times;</span>
-                        <h3>Edit Price for "${item.title}"</h3>
-                        <div class="form-group">
-                            <label for="edit-price-input">New Price ($)</label>
-                            <input type="number" id="edit-price-input" min="0.01" step="0.01" value="${item.price}" required>
-                        </div>
-                        <input type="hidden" id="edit-item-id" value="${item.item_id}">
-                        <button type="button" id="update-price-button" class="btn btn-primary">Update Price</button>
+                <div class="modal-content">
+                    <span class="close-button">&times;</span>
+                    <h3>Edit Price for "${item.title}"</h3>
+                    <div class="form-group">
+                        <label for="edit-price-input">New Price ($)</label>
+                        <input type="number" id="edit-price-input" min="0.01" step="0.01" value="${item.price}" required>
                     </div>
-                `;
+                    <input type="hidden" id="edit-item-id" value="${item.item_id}">
+                    <button type="button" id="update-price-button" class="btn btn-primary">Update Price</button>
+                </div>
+            `;
 
                 // Add to the page
                 document.body.appendChild(dialog);
@@ -563,11 +563,10 @@ const clearFieldErrors = formEl => {
                 // Show the dialog
                 dialog.style.display = 'block';
 
-                // Set up direct event listeners without event delegation
+                // Set up event listeners without {once: true} option
                 const updateButton = document.getElementById('update-price-button');
                 if (updateButton) {
-                    // Use a one-time event listener to prevent double-firing
-                    updateButton.addEventListener('click', submitPriceUpdate, { once: true });
+                    updateButton.addEventListener('click', submitPriceUpdate);
                 }
 
                 const closeButton = dialog.querySelector('.close-button');
@@ -590,7 +589,7 @@ const clearFieldErrors = formEl => {
 
     // Submit price update
     function submitPriceUpdate(e) {
-        // Prevent any event bubbling
+        // Prevent any event bubbling to avoid double-triggering
         if (e) e.stopPropagation();
 
         const itemIdElement = document.getElementById('edit-item-id');
@@ -685,92 +684,92 @@ const clearFieldErrors = formEl => {
 
     // Sell a new item
     async function sellItem() {
-        const formEl        = document.getElementById('sell-form');
-        const titleInput    = document.getElementById('item-title-input');
-        const descInput     = document.getElementById('item-description-input');
-        const priceInput    = document.getElementById('item-price-input');
+        const formEl = document.getElementById('sell-form');
+        const titleInput = document.getElementById('item-title-input');
+        const descInput = document.getElementById('item-description-input');
+        const priceInput = document.getElementById('item-price-input');
         const categoryInput = document.getElementById('item-category-input');
-        const fileInput     = document.getElementById('item-file-input');
-        const thumbInput    = document.getElementById('item-thumbnail-input');
-      
+        const fileInput = document.getElementById('item-file-input');
+        const thumbInput = document.getElementById('item-thumbnail-input');
+
         clearFieldErrors(formEl);
-      
-        const title       = titleInput.value.trim();
+
+        const title = titleInput.value.trim();
         const description = descInput.value.trim();
-        const price       = priceInput.value;
-        const categoryId  = categoryInput.value;
-      
+        const price = priceInput.value;
+        const categoryId = categoryInput.value;
+
         let hasError = false;
-      
+
         // Title: required + pattern
         if (!title) {
-          showFieldError(titleInput, 'Please enter a title');
-          hasError = true;
+            showFieldError(titleInput, 'Please enter a title');
+            hasError = true;
         } else if (titleInput.validity.patternMismatch) {
-          // Use the input’s title attribute to show a helpful message
-          showFieldError(titleInput, titleInput.title);
-          hasError = true;
+            // Use the input’s title attribute to show a helpful message
+            showFieldError(titleInput, titleInput.title);
+            hasError = true;
         }
-      
+
         // Description: required
         if (!description) {
-          showFieldError(descInput, 'Please enter a description');
-          hasError = true;
+            showFieldError(descInput, 'Please enter a description');
+            hasError = true;
         }
-      
+
         // Price: required + > 0 + respect min attribute
         if (!price) {
-          showFieldError(priceInput, 'Please enter a price');
-          hasError = true;
+            showFieldError(priceInput, 'Please enter a price');
+            hasError = true;
         } else if (parseFloat(price) <= 0) {
-          showFieldError(priceInput, 'Enter a price above $0');
-          hasError = true;
+            showFieldError(priceInput, 'Enter a price above $0');
+            hasError = true;
         } else if (priceInput.validity.rangeUnderflow) {
-          showFieldError(priceInput, `Minimum price is $${priceInput.min}`);
-          hasError = true;
+            showFieldError(priceInput, `Minimum price is $${priceInput.min}`);
+            hasError = true;
         }
-      
+
         // Category: required
         if (!categoryId) {
-          showFieldError(categoryInput, 'Please select a category');
-          hasError = true;
+            showFieldError(categoryInput, 'Please select a category');
+            hasError = true;
         }
-      
-                    // ── NEW: File‑size limits ──
-            const MAX_FILE_SIZE   = 50 * 1024 * 1024;  // 50 MB
-            const MAX_THUMB_SIZE  = 5  * 1024 * 1024;  // 5 MB
 
-            if (fileInput.files[0] && fileInput.files[0].size > MAX_FILE_SIZE) {
-                showFieldError(fileInput, 'Main file must be under 50 MB');
-                hasError = true;
-            }
+        // ── NEW: File‑size limits ──
+        const MAX_FILE_SIZE = 50 * 1024 * 1024;  // 50 MB
+        const MAX_THUMB_SIZE = 5 * 1024 * 1024;  // 5 MB
 
-            if (thumbInput.files[0] && thumbInput.files[0].size > MAX_THUMB_SIZE) {
-                showFieldError(thumbInput, 'Thumbnail must be under 5 MB');
-                hasError = true;
-            }
-      
+        if (fileInput.files[0] && fileInput.files[0].size > MAX_FILE_SIZE) {
+            showFieldError(fileInput, 'Main file must be under 50 MB');
+            hasError = true;
+        }
+
+        if (thumbInput.files[0] && thumbInput.files[0].size > MAX_THUMB_SIZE) {
+            showFieldError(thumbInput, 'Thumbnail must be under 5 MB');
+            hasError = true;
+        }
+
         // If anything failed, bail out now
         if (hasError) return;
-      
+
         // 4) If you reach here, all fields are valid—proceed as before
         const formData = new FormData();
         formData.append('title', title);
         formData.append('description', description);
         formData.append('price', price);
         formData.append('category_id', categoryId);
-        if (fileInput.files[0])  formData.append('file', fileInput.files[0]);
+        if (fileInput.files[0]) formData.append('file', fileInput.files[0]);
         if (thumbInput.files[0]) formData.append('thumbnail', thumbInput.files[0]);
-      
+
         try {
-          const item = await apiRequest('/items', 'POST', formData);
-          showAlert('Item listed successfully!', 'success');
-          navigateTo(item.item_id ? 'item' : 'profile', item.item_id ? { itemId: item.item_id } : {});
+            const item = await apiRequest('/items', 'POST', formData);
+            showAlert('Item listed successfully!', 'success');
+            navigateTo(item.item_id ? 'item' : 'profile', item.item_id ? { itemId: item.item_id } : {});
         } catch (error) {
-          showAlert('Failed to list item: ' + error.message, 'danger');
+            showAlert('Failed to list item: ' + error.message, 'danger');
         }
-      }
-      
+    }
+
 
     // Edit a review
     function editReview(reviewId, reviewElement) {
@@ -1356,16 +1355,16 @@ const clearFieldErrors = formEl => {
     // Check for unread alerts
     async function checkForAlerts() {
         if (!state.user) return;
-    
+
         try {
             const alertsResponse = await apiRequest('/alerts');
             const alerts = alertsResponse.alerts || alertsResponse;
-            
+
             // Count only unread notification alerts (not monitoring alerts)
-            const unreadCount = alerts.filter(alert => 
+            const unreadCount = alerts.filter(alert =>
                 !alert.is_read && alert.alert_details !== 'MONITORING'
             ).length;
-    
+
             state.alertCount = unreadCount;
             updateAuthUI();
         } catch (error) {
@@ -2274,34 +2273,34 @@ const clearFieldErrors = formEl => {
     async function loadAlerts() {
         const container = document.getElementById('alerts-container');
         if (!container) return;
-    
+
         container.innerHTML = '<div class="loading">Loading...</div>';
-    
+
         try {
             const alertsResponse = await apiRequest('/alerts');
             const alerts = alertsResponse.alerts || alertsResponse;
-    
+
             // Filter out monitoring alerts with no actual notifications
-            const displayAlerts = alerts.filter(alert => 
+            const displayAlerts = alerts.filter(alert =>
                 alert.alert_details !== 'Monitoring active' || !alert.is_read
             );
-    
+
             if (!displayAlerts || displayAlerts.length === 0) {
                 container.innerHTML = '<p class="no-alerts">No alerts to display</p>';
                 return;
             }
-    
+
             container.innerHTML = '';
-    
+
             displayAlerts.forEach(alert => {
                 const alertElement = createAlertElement(alert);
                 if (alertElement) {
                     container.appendChild(alertElement);
                 }
             });
-    
+
             // Update alert count (only count unread notification alerts)
-            state.alertCount = displayAlerts.filter(alert => 
+            state.alertCount = displayAlerts.filter(alert =>
                 !alert.is_read && alert.alert_details !== 'Monitoring active'
             ).length;
             updateAuthUI();
@@ -2313,24 +2312,24 @@ const clearFieldErrors = formEl => {
     // Create alert element
     function createAlertElement(alert) {
         if (!alert) return null;
-    
+
         const element = document.createElement('div');
         element.className = 'alert-card';
-    
+
         if (!alert.is_read) {
             element.classList.add('unread');
         }
-    
+
         element.dataset.id = alert.alert_id;
-    
+
         if (alert.item_id) {
             element.dataset.itemId = alert.item_id;
             element.style.cursor = 'pointer';
         }
-    
+
         let alertTitle = '';
         let alertInfo = '';
-    
+
         // Check if this is a monitoring alert or a notification
         if (alert.alert_details === 'MONITORING') {
             // This is a monitoring alert
@@ -2355,7 +2354,7 @@ const clearFieldErrors = formEl => {
             alertTitle = alert.alert_type_name + ' Alert';
             alertInfo = alert.alert_details || 'You have a new alert';
         }
-    
+
         element.innerHTML = `
             <div class="alert-content">
                 <div class="alert-title">${alertTitle}</div>
@@ -2363,17 +2362,17 @@ const clearFieldErrors = formEl => {
                 <div class="alert-date">${new Date(alert.created_at).toLocaleString()}</div>
             </div>
             <div class="alert-actions">
-                ${!alert.is_read && alert.alert_details !== 'MONITORING' ? 
-                    `<button class="btn btn-secondary" data-action="markRead">Mark as Read</button>` : ''}
+                ${!alert.is_read && alert.alert_details !== 'MONITORING' ?
+                `<button class="btn btn-secondary" data-action="markRead">Mark as Read</button>` : ''}
                 <button class="btn btn-danger" data-action="deleteAlert"><i class="fas fa-trash"></i></button>
             </div>
         `;
-    
+
         // Add click event listener to navigate to item page if item_id exists
         if (alert.item_id && alert.alert_details !== 'MONITORING') {
             element.addEventListener('click', (e) => {
-                if (e.target.tagName === 'BUTTON' || 
-                    e.target.closest('button') || 
+                if (e.target.tagName === 'BUTTON' ||
+                    e.target.closest('button') ||
                     e.target.tagName === 'I') {
                     return;
                 }
@@ -2383,7 +2382,7 @@ const clearFieldErrors = formEl => {
                 }
             });
         }
-    
+
         return element;
     }
 

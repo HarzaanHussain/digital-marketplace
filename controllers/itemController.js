@@ -46,6 +46,7 @@ const checkNewItemAlerts = async (itemId, categoryId, sellerId) => {
 };
 
 // Helper function to check for price drop alerts
+// Helper function to check for price drop alerts
 const checkPriceDropAlerts = async (itemId, newPrice, sellerId) => {
   try {
     // Find monitoring alerts for this item
@@ -72,13 +73,30 @@ const checkPriceDropAlerts = async (itemId, newPrice, sellerId) => {
     // Create notification alerts for users where the new price meets their threshold
     for (const alert of alerts) {
       if (alert.price_threshold && parseFloat(newPrice) <= parseFloat(alert.price_threshold)) {
-        const alertDetails = `Price drop! "${item.title}" now costs $${parseFloat(newPrice).toFixed(2)} (Your threshold: $${parseFloat(alert.price_threshold).toFixed(2)})`;
-        
-        await pool.query(
-          `INSERT INTO user_alerts (user_id, alert_type_id, item_id, is_read, price_threshold, alert_details)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [alert.user_id, alert.alert_type_id, itemId, false, alert.price_threshold, alertDetails]
+        // Check if we've already sent an alert at or below this price
+        const [existingAlerts] = await pool.query(
+          `SELECT * FROM user_alerts 
+           WHERE user_id = ? 
+           AND item_id = ? 
+           AND alert_type_id = ? 
+           AND alert_details != 'MONITORING'
+           ORDER BY created_at DESC
+           LIMIT 1`,
+          [alert.user_id, itemId, alert.alert_type_id]
         );
+        // If no previous alert or the last alert doesn't mention this price, send a new alert
+        const shouldSendAlert = existingAlerts.length === 0 || 
+                        !existingAlerts[0].alert_details.includes(`now costs $${parseFloat(newPrice).toFixed(2)}`);
+        
+        if (shouldSendAlert) {
+          const alertDetails = `Price drop! "${item.title}" now costs $${parseFloat(newPrice).toFixed(2)} (Your threshold: $${parseFloat(alert.price_threshold).toFixed(2)})`;
+          
+          await pool.query(
+            `INSERT INTO user_alerts (user_id, alert_type_id, item_id, is_read, price_threshold, alert_details)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [alert.user_id, alert.alert_type_id, itemId, false, alert.price_threshold, alertDetails]
+          );
+        }
       }
     }
   } catch (error) {
