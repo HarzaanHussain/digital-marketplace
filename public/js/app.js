@@ -2509,53 +2509,53 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-   // Create alert element
-function createAlertElement(alert) {
-    if (!alert) return null;
+    // Create alert element
+    function createAlertElement(alert) {
+        if (!alert) return null;
 
-    const element = document.createElement('div');
-    element.className = 'alert-card';
+        const element = document.createElement('div');
+        element.className = 'alert-card';
 
-    if (!alert.is_read) {
-        element.classList.add('unread');
-    }
-
-    element.dataset.id = alert.alert_id;
-
-    if (alert.item_id) {
-        element.dataset.itemId = alert.item_id;
-        element.style.cursor = 'pointer';
-    }
-
-    let alertTitle = '';
-    let alertInfo = '';
-
-    // Check if this is a monitoring alert or a notification
-    if (alert.alert_details === 'MONITORING') {
-        // This is a monitoring alert
-        switch (alert.alert_type_name) {
-            case 'Price Drop':
-                alertTitle = 'Price Drop Monitor';
-                alertInfo = `Monitoring price drops for ${alert.item_title || 'an item'}`;
-                if (alert.price_threshold) {
-                    alertInfo += ` (threshold: $${parseFloat(alert.price_threshold).toFixed(2)})`;
-                }
-                break;
-            case 'New Item':
-                alertTitle = 'New Item Monitor';
-                alertInfo = `Monitoring new items in ${alert.category_name || 'a category'}`;
-                break;
-            default:
-                alertTitle = 'Alert Monitor';
-                alertInfo = 'Monitoring active';
+        if (!alert.is_read) {
+            element.classList.add('unread');
         }
-    } else {
-        // This is a notification alert
-        alertTitle = alert.alert_type_name + ' Alert';
-        alertInfo = alert.alert_details || 'You have a new alert';
-    }
 
-    element.innerHTML = `
+        element.dataset.id = alert.alert_id;
+
+        if (alert.item_id) {
+            element.dataset.itemId = alert.item_id;
+            element.style.cursor = 'pointer';
+        }
+
+        let alertTitle = '';
+        let alertInfo = '';
+
+        // Check if this is a monitoring alert or a notification
+        if (alert.alert_details === 'MONITORING') {
+            // This is a monitoring alert
+            switch (alert.alert_type_name) {
+                case 'Price Drop':
+                    alertTitle = 'Price Drop Monitor';
+                    alertInfo = `Monitoring price drops for ${alert.item_title || 'an item'}`;
+                    if (alert.price_threshold) {
+                        alertInfo += ` (threshold: $${parseFloat(alert.price_threshold).toFixed(2)})`;
+                    }
+                    break;
+                case 'New Item':
+                    alertTitle = 'New Item Monitor';
+                    alertInfo = `Monitoring new items in ${alert.category_name || 'a category'}`;
+                    break;
+                default:
+                    alertTitle = 'Alert Monitor';
+                    alertInfo = 'Monitoring active';
+            }
+        } else {
+            // This is a notification alert
+            alertTitle = alert.alert_type_name + ' Alert';
+            alertInfo = alert.alert_details || 'You have a new alert';
+        }
+
+        element.innerHTML = `
         <div class="alert-content">
             <div class="alert-title">${alertTitle}</div>
             <div class="alert-info">${alertInfo}</div>
@@ -2563,28 +2563,28 @@ function createAlertElement(alert) {
         </div>
         <div class="alert-actions">
             ${!alert.is_read && alert.alert_details !== 'MONITORING' ?
-            `<button class="btn btn-secondary" data-action="markRead">Mark as Read</button>` : ''}
+                `<button class="btn btn-secondary" data-action="markRead">Mark as Read</button>` : ''}
             <button class="btn btn-danger" data-action="deleteAlert"><i class="fas fa-trash"></i></button>
         </div>
     `;
 
-    // Add click event listener to navigate to item page if item_id exists
-    if (alert.item_id && alert.alert_details !== 'MONITORING') {
-        element.addEventListener('click', (e) => {
-            if (e.target.tagName === 'BUTTON' ||
-                e.target.closest('button') ||
-                e.target.tagName === 'I') {
-                return;
-            }
-            navigateTo('item', { itemId: alert.item_id });
-            if (!alert.is_read) {
-                markAlertAsRead(alert.alert_id);
-            }
-        });
-    }
+        // Add click event listener to navigate to item page if item_id exists
+        if (alert.item_id && alert.alert_details !== 'MONITORING') {
+            element.addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON' ||
+                    e.target.closest('button') ||
+                    e.target.tagName === 'I') {
+                    return;
+                }
+                navigateTo('item', { itemId: alert.item_id });
+                if (!alert.is_read) {
+                    markAlertAsRead(alert.alert_id);
+                }
+            });
+        }
 
-    return element;
-}
+        return element;
+    }
 
     // Mark alert as read
     async function markAlertAsRead(alertId) {
