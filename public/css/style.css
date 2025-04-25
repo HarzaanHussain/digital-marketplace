@@ -1120,3 +1120,55 @@ footer {
 
 
   .section { margin-block: 3rem; }     /* ∼48 px space top & bottom */
+  .danger-zone {
+    margin-top: 2rem;
+    padding: 1rem;
+    border: 1px solid #dc3545;
+    border-radius: 0.25rem;
+  }
+  
+  .danger-zone h4 {
+    color: #dc3545;
+    margin-top: 0;
+  }
+  
+  .danger-zone .help-text {
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    color: #6c757d;
+  }
+  
+  .review-card {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    border-radius: 0.25rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+  
+  .review-card-content {
+    flex: 1;
+  }
+  
+  .review-card-title {
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+  }
+  
+  .review-card-comment {
+    margin: 0.5rem 0;
+  }
+  
+  .review-card-date {
+    font-size: 0.875rem;
+    color: #6c757d;
+  }
+  
+  .review-card-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-left: 1rem;
+  }

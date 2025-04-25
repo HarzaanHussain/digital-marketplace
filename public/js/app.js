@@ -207,7 +207,107 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'updatePrice':
                     submitPriceUpdate();
                     break;
+                case 'deleteReview':
+                    if (e.target.dataset.id) {
+                        confirmDeleteReview(e.target.dataset.id);
+                    }
+                    break;
             }
+        }
+    }
+    async function loadUserReviews() {
+        const container = document.getElementById('user-reviews-container');
+        if (!container) return;
+
+        container.innerHTML = '<div class="loading">Loading...</div>';
+
+        try {
+            const reviewsResponse = await apiRequest('/reviews/user');
+            const reviews = reviewsResponse.reviews || reviewsResponse;
+
+            if (!reviews || reviews.length === 0) {
+                container.innerHTML = '<p class="no-reviews">You haven\'t written any reviews yet</p>';
+                return;
+            }
+
+            container.innerHTML = '';
+
+            reviews.forEach(review => {
+                const reviewElement = createUserReviewElement(review);
+                if (reviewElement) {
+                    container.appendChild(reviewElement);
+                }
+            });
+        } catch (error) {
+            container.innerHTML = '<p class="error">Failed to load reviews</p>';
+        }
+    }
+
+    // Create a review element for user profile
+    function createUserReviewElement(review) {
+        if (!review) return null;
+
+        const element = document.createElement('div');
+        element.className = 'review-card';
+        element.dataset.id = review.review_id;
+
+        const date = new Date(review.created_at).toLocaleDateString();
+
+        element.innerHTML = `
+            <div class="review-card-content">
+                <div class="review-card-title">${review.item_title || 'Unknown Item'}</div>
+                <div class="star-rating">${createStarRating(review.rating)}</div>
+                <div class="review-card-comment">${review.comment || ''}</div>
+                <div class="review-card-date">${date}</div>
+            </div>
+            <div class="review-card-actions">
+                <button class="btn btn-secondary btn-sm" data-action="editReview" data-id="${review.review_id}">
+                    <i class="fas fa-edit"></i> Edit
+                </button>
+                <button class="btn btn-danger btn-sm" data-action="deleteReview" data-id="${review.review_id}">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </div>
+        `;
+
+        // Make the card clickable to navigate to item page if not deleted
+        if (!review.is_deleted) {
+            element.style.cursor = 'pointer';
+            element.addEventListener('click', (e) => {
+                // Don't navigate if clicking on the button
+                if (e.target.tagName === 'BUTTON' ||
+                    e.target.closest('button') ||
+                    e.target.tagName === 'I') {
+                    return;
+                }
+                navigateTo('item', { itemId: review.item_id });
+            });
+        }
+
+        return element;
+    }
+
+
+    function confirmDeleteReview(reviewId) {
+        if (confirm('Are you sure you want to delete this review? This action cannot be undone.')) {
+            deleteReview(reviewId);
+        }
+    }
+
+    async function deleteReview(reviewId) {
+        try {
+            await apiRequest(`/reviews/${reviewId}`, 'DELETE');
+            showAlert('Review deleted successfully!', 'success');
+
+            // If on item detail page, reload reviews
+            if (state.currentPage === 'item' && state.currentItemId) {
+                loadItem(state.currentItemId);
+            } else if (state.currentPage === 'profile') {
+                // If on profile page and there's a user reviews section, reload it
+                loadUserReviews();
+            }
+        } catch (error) {
+            showAlert('Failed to delete review: ' + error.message, 'danger');
         }
     }
 
@@ -362,11 +462,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 renderTemplate('login-template', pageContent);
 
+                // Set up login form
                 const loginForm = document.getElementById('login-form');
                 if (loginForm) {
                     loginForm.addEventListener('submit', (e) => {
                         e.preventDefault();
                         login();
+                    });
+                }
+
+                const registerLinkFromLogin = pageContent.querySelector('a[data-page="register"]');
+                if (registerLinkFromLogin) {
+                    registerLinkFromLogin.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        navigateTo('register');
                     });
                 }
                 break;
@@ -379,11 +488,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 renderTemplate('register-template', pageContent);
 
+                // Set up register form
                 const registerForm = document.getElementById('register-form');
                 if (registerForm) {
                     registerForm.addEventListener('submit', (e) => {
                         e.preventDefault();
                         register();
+                    });
+                }
+
+                const loginLinkFromRegister = pageContent.querySelector('a[data-page="login"]');
+                if (loginLinkFromRegister) {
+                    loginLinkFromRegister.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        navigateTo('login');
                     });
                 }
                 break;
@@ -644,6 +762,31 @@ document.addEventListener('DOMContentLoaded', () => {
             });
     }
 
+    function confirmDeleteAccount() {
+        if (confirm('WARNING: Are you sure you want to delete your account? This action cannot be undone and all your listings will be removed.')) {
+            deleteAccount();
+        }
+    }
+
+    async function deleteAccount() {
+        try {
+            await apiRequest('/users', 'DELETE');
+            showAlert('Your account has been successfully deleted.', 'success');
+
+            // Clear token and user data
+            localStorage.removeItem('token');
+            state.token = null;
+            state.user = null;
+            state.currentItemId = null;
+
+            // Update UI and redirect
+            updateAuthUI();
+            navigateTo('home');
+        } catch (error) {
+            showAlert('Failed to delete account: ' + error.message, 'danger');
+        }
+    }
+
 
     // Load categories for sell form
     async function loadCategoriesForSell() {
@@ -752,7 +895,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // If anything failed, bail out now
         if (hasError) return;
 
-        // 4) If you reach here, all fields are valid—proceed as before
         const formData = new FormData();
         formData.append('title', title);
         formData.append('description', description);
@@ -1756,11 +1898,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // Check if this is the current user's review
         const isUserReview = state.user && review.reviewer_id === state.user.user_id;
 
-        // Add edit buttons for user's own reviews
-        const editButton = isUserReview ?
+        // Add edit and delete buttons for user's own reviews
+        const reviewActions = isUserReview ?
             `<div class="review-actions">
                 <button class="btn btn-secondary btn-sm" data-action="editReview" data-id="${review.review_id}">
                     <i class="fas fa-edit"></i> Edit
+                </button>
+                <button class="btn btn-danger btn-sm" data-action="deleteReview" data-id="${review.review_id}">
+                    <i class="fas fa-trash"></i> Delete
                 </button>
             </div>` : '';
 
@@ -1768,7 +1913,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="review-header">
                 <span class="reviewer">${review.reviewer_name}</span>
                 <span class="review-date">${date}</span>
-                ${editButton}
+                ${reviewActions}
             </div>
             <div class="star-rating">
                 ${createStarRating(review.rating)}
@@ -1983,6 +2128,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (profileImage) {
                 profileImage.src = profile.profile_image || '/img/default-profile.png';
             }
+
+            // Set up delete account button
+            const deleteAccountButton = document.getElementById('delete-account-button');
+            if (deleteAccountButton) {
+                deleteAccountButton.addEventListener('click', confirmDeleteAccount);
+            }
         } catch (error) {
             showAlert('Failed to load profile', 'danger');
         }
@@ -2072,8 +2223,12 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.tab-pane').forEach(pane => {
             pane.classList.toggle('active', pane.id === `${tab}-tab`);
         });
-    }
 
+        // Load content based on tab
+        if (tab === 'reviews' && state.currentPage === 'profile') {
+            loadUserReviews();
+        }
+    }
     // Load user purchases
     async function loadPurchases() {
         const container = document.getElementById('purchases-container');
@@ -2161,6 +2316,25 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
 
+        // Add click handler to navigate to item
+        element.style.cursor = 'pointer';
+        element.addEventListener('click', (e) => {
+            // Don't navigate if clicking on the button
+            if (e.target.tagName === 'BUTTON' ||
+                e.target.closest('button') ||
+                e.target.tagName === 'I') {
+                return;
+            }
+
+            // Mark as read if unread
+            if (!notification.is_read) {
+                markNotificationAsRead(notification.notification_id);
+            }
+
+            // Navigate to item page
+            navigateTo('item', { itemId: notification.item_id });
+        });
+
         return element;
     }
 
@@ -2198,6 +2372,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 </button>
             </div>
         `;
+
+        // Make the card clickable to navigate to item page if not deleted
+        if (!purchase.is_deleted) {
+            element.style.cursor = 'pointer';
+            element.addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON' ||
+                    e.target.closest('button') ||
+                    e.target.tagName === 'I') {
+                    return;
+                }
+                navigateTo('item', { itemId: purchase.item_id });
+            });
+        }
 
         return element;
     }
@@ -2265,9 +2452,22 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
 
+        // Make the card clickable to navigate to item page if not deleted
+        if (!sale.is_deleted) {
+            element.style.cursor = 'pointer';
+            element.addEventListener('click', (e) => {
+                // Don't navigate if clicking on the button
+                if (e.target.tagName === 'BUTTON' ||
+                    e.target.closest('button') ||
+                    e.target.tagName === 'I') {
+                    return;
+                }
+                navigateTo('item', { itemId: sale.item_id });
+            });
+        }
+
         return element;
     }
-
     // Alerts Page Functions
     // Load user alerts
     async function loadAlerts() {
@@ -2309,82 +2509,82 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Create alert element
-    function createAlertElement(alert) {
-        if (!alert) return null;
+   // Create alert element
+function createAlertElement(alert) {
+    if (!alert) return null;
 
-        const element = document.createElement('div');
-        element.className = 'alert-card';
+    const element = document.createElement('div');
+    element.className = 'alert-card';
 
-        if (!alert.is_read) {
-            element.classList.add('unread');
-        }
-
-        element.dataset.id = alert.alert_id;
-
-        if (alert.item_id) {
-            element.dataset.itemId = alert.item_id;
-            element.style.cursor = 'pointer';
-        }
-
-        let alertTitle = '';
-        let alertInfo = '';
-
-        // Check if this is a monitoring alert or a notification
-        if (alert.alert_details === 'MONITORING') {
-            // This is a monitoring alert
-            switch (alert.alert_type_name) {
-                case 'Price Drop':
-                    alertTitle = 'Price Drop Monitor';
-                    alertInfo = `Monitoring price drops for ${alert.item_title || 'an item'}`;
-                    if (alert.price_threshold) {
-                        alertInfo += ` (threshold: $${parseFloat(alert.price_threshold).toFixed(2)})`;
-                    }
-                    break;
-                case 'New Item':
-                    alertTitle = 'New Item Monitor';
-                    alertInfo = `Monitoring new items in ${alert.category_name || 'a category'}`;
-                    break;
-                default:
-                    alertTitle = 'Alert Monitor';
-                    alertInfo = 'Monitoring active';
-            }
-        } else {
-            // This is a notification alert
-            alertTitle = alert.alert_type_name + ' Alert';
-            alertInfo = alert.alert_details || 'You have a new alert';
-        }
-
-        element.innerHTML = `
-            <div class="alert-content">
-                <div class="alert-title">${alertTitle}</div>
-                <div class="alert-info">${alertInfo}</div>
-                <div class="alert-date">${new Date(alert.created_at).toLocaleString()}</div>
-            </div>
-            <div class="alert-actions">
-                ${!alert.is_read && alert.alert_details !== 'MONITORING' ?
-                `<button class="btn btn-secondary" data-action="markRead">Mark as Read</button>` : ''}
-                <button class="btn btn-danger" data-action="deleteAlert"><i class="fas fa-trash"></i></button>
-            </div>
-        `;
-
-        // Add click event listener to navigate to item page if item_id exists
-        if (alert.item_id && alert.alert_details !== 'MONITORING') {
-            element.addEventListener('click', (e) => {
-                if (e.target.tagName === 'BUTTON' ||
-                    e.target.closest('button') ||
-                    e.target.tagName === 'I') {
-                    return;
-                }
-                navigateTo('item', { itemId: alert.item_id });
-                if (!alert.is_read) {
-                    markAlertAsRead(alert.alert_id);
-                }
-            });
-        }
-
-        return element;
+    if (!alert.is_read) {
+        element.classList.add('unread');
     }
+
+    element.dataset.id = alert.alert_id;
+
+    if (alert.item_id) {
+        element.dataset.itemId = alert.item_id;
+        element.style.cursor = 'pointer';
+    }
+
+    let alertTitle = '';
+    let alertInfo = '';
+
+    // Check if this is a monitoring alert or a notification
+    if (alert.alert_details === 'MONITORING') {
+        // This is a monitoring alert
+        switch (alert.alert_type_name) {
+            case 'Price Drop':
+                alertTitle = 'Price Drop Monitor';
+                alertInfo = `Monitoring price drops for ${alert.item_title || 'an item'}`;
+                if (alert.price_threshold) {
+                    alertInfo += ` (threshold: $${parseFloat(alert.price_threshold).toFixed(2)})`;
+                }
+                break;
+            case 'New Item':
+                alertTitle = 'New Item Monitor';
+                alertInfo = `Monitoring new items in ${alert.category_name || 'a category'}`;
+                break;
+            default:
+                alertTitle = 'Alert Monitor';
+                alertInfo = 'Monitoring active';
+        }
+    } else {
+        // This is a notification alert
+        alertTitle = alert.alert_type_name + ' Alert';
+        alertInfo = alert.alert_details || 'You have a new alert';
+    }
+
+    element.innerHTML = `
+        <div class="alert-content">
+            <div class="alert-title">${alertTitle}</div>
+            <div class="alert-info">${alertInfo}</div>
+            <div class="alert-date">${new Date(alert.created_at).toLocaleString()}</div>
+        </div>
+        <div class="alert-actions">
+            ${!alert.is_read && alert.alert_details !== 'MONITORING' ?
+            `<button class="btn btn-secondary" data-action="markRead">Mark as Read</button>` : ''}
+            <button class="btn btn-danger" data-action="deleteAlert"><i class="fas fa-trash"></i></button>
+        </div>
+    `;
+
+    // Add click event listener to navigate to item page if item_id exists
+    if (alert.item_id && alert.alert_details !== 'MONITORING') {
+        element.addEventListener('click', (e) => {
+            if (e.target.tagName === 'BUTTON' ||
+                e.target.closest('button') ||
+                e.target.tagName === 'I') {
+                return;
+            }
+            navigateTo('item', { itemId: alert.item_id });
+            if (!alert.is_read) {
+                markAlertAsRead(alert.alert_id);
+            }
+        });
+    }
+
+    return element;
+}
 
     // Mark alert as read
     async function markAlertAsRead(alertId) {
@@ -2446,6 +2646,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const categoryGroup = document.getElementById('alert-category-group');
         const priceGroup = document.getElementById('alert-price-group');
 
+        // Hide all fields first
         if (itemGroup) itemGroup.classList.add('hidden');
         if (categoryGroup) categoryGroup.classList.add('hidden');
         if (priceGroup) priceGroup.classList.add('hidden');
@@ -2459,10 +2660,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             case 'New Item':
                 if (categoryGroup) categoryGroup.classList.remove('hidden');
-                break;
-            case 'Back in Stock':
-            case 'Seller Update':
-                if (itemGroup) itemGroup.classList.remove('hidden');
                 break;
         }
     }
@@ -2610,6 +2807,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const alertTypeText = alertTypeInput.options[selectedIndex].text;
 
+        // Validate based on alert type
         switch (alertTypeText) {
             case 'Price Drop':
                 if (!itemId) {
@@ -2628,33 +2826,25 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 break;
-            case 'Back in Stock':
-            case 'Seller Update':
-                if (!itemId) {
-                    showAlert('Please select an item', 'warning');
-                    return;
-                }
-                break;
+            default:
+                showAlert('Unsupported alert type', 'warning');
+                return;
         }
 
         try {
-            // For price drop alerts, check if threshold is below current price
+            // Check if the price threshold is valid for Price Drop alerts
             if (alertTypeText === 'Price Drop' && itemId) {
-                try {
-                    const item = await apiRequest(`/items/${itemId}`);
-                    const currentPrice = parseFloat(item.price);
-                    const threshold = parseFloat(priceThreshold);
+                const item = await apiRequest(`/items/${itemId}`);
+                const currentPrice = parseFloat(item.price);
+                const threshold = parseFloat(priceThreshold);
 
-                    if (threshold >= currentPrice) {
-                        showAlert(`Price threshold must be below the current price ($${currentPrice.toFixed(2)})`, 'warning');
-                        return;
-                    }
-                } catch (error) {
-                    console.error('Error checking item price:', error);
-                    // Continue anyway
+                if (threshold >= currentPrice) {
+                    showAlert(`Price threshold must be below the current price ($${currentPrice.toFixed(2)})`, 'warning');
+                    return;
                 }
             }
 
+            // Create the alert
             await apiRequest('/alerts', 'POST', {
                 alert_type_id: alertTypeId,
                 item_id: itemId || null,
@@ -2663,15 +2853,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             showAlert('Alert created successfully!', 'success');
-
-            // Close modal and reload alerts
             closeModal();
             loadAlerts();
         } catch (error) {
             showAlert('Failed to create alert: ' + error.message, 'danger');
         }
     }
-
     // Add CSS for price edit dialog
     const style = document.createElement('style');
     style.textContent = `

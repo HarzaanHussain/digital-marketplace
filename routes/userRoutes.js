@@ -7,13 +7,15 @@ const {
   getUserProfile,
   updateUserProfile,
   getUsers,
-  getUserById
+  getUserById,
+  deleteUser
 } = require('../controllers/userController');
 
 router.post('/', registerUser);
 router.post('/login', loginUser);
 router.get('/profile', protect, getUserProfile);
 router.put('/profile', protect, updateUserProfile);
+router.delete('/', protect, deleteUser);
 router.get('/', getUsers);
 router.get('/:id', getUserById);
 

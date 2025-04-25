@@ -253,6 +253,11 @@
                         </div>
                         
                         <button type="submit" class="btn btn-primary">Update Profile</button>
+                        <div class="danger-zone">
+                            <h4>Danger Zone</h4>
+                            <button type="button" class="btn btn-danger" id="delete-account-button">Delete Account</button>
+                            <p class="help-text">This action cannot be undone. All your listings will be marked as deleted.</p>
+                          </div>
                     </form>
                 </div>
             </div>
@@ -261,11 +266,20 @@
                 <ul class="tab-nav">
                     <li class="tab-item active" data-tab="purchases">Your Purchases</li>
                     <li class="tab-item" data-tab="sales">Your Sales</li>
+                    <li class="tab-item" data-tab="reviews">Your Reviews</li>
                     <li class="tab-item" data-tab="notifications">
-                        Sale Notifications
-                        <span id="notification-badge-tab" class="badge hidden">0</span>
+                      Sale Notifications
+                      <span id="notification-badge-tab" class="badge hidden">0</span>
                     </li>
-                </ul>
+                  </ul>
+                  <div id="reviews-tab" class="tab-pane">
+                    <h3>Your Reviews</h3>
+                    <div id="user-reviews-container">
+                      <!-- Reviews will be loaded dynamically -->
+                      <div class="loading">Loading...</div>
+                    </div>
+                  </div>
+                  
                 
                 <div class="tab-content">
                     <div id="purchases-tab" class="tab-pane active">

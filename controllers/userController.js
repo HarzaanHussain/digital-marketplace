@@ -441,11 +441,101 @@ const getUserById = async (req, res) => {
   }
 };
 
+
+
+// @desc    Delete user account
+// @route   DELETE /api/users
+// @access  Private
+const deleteUser = async (req, res) => {
+  try {
+    await pool.query('START TRANSACTION');
+    
+    // Get user ID
+    const userId = req.user.user_id;
+    
+    await pool.query(
+      'DELETE FROM user_alerts WHERE user_id = ?',
+      [userId]
+    );
+    
+    await pool.query(
+      'DELETE FROM reviews WHERE reviewer_id = ?',
+      [userId]
+    );
+    
+    await pool.query(
+      'UPDATE items SET is_deleted = true WHERE seller_id = ?',
+      [userId]
+    );
+    
+    try {
+      // Check if seller_notifications table exists first
+      const [tableCheck] = await pool.query(`
+        SELECT COUNT(*) as table_exists
+        FROM information_schema.tables
+        WHERE table_schema = DATABASE()
+        AND table_name = 'seller_notifications'
+      `);
+      
+      if (tableCheck[0].table_exists > 0) {
+        await pool.query(
+          'DELETE FROM seller_notifications WHERE seller_id = ?',
+          [userId]
+        );
+      }
+    } catch (error) {
+      console.error('Error handling seller notifications:', error);
+      // Continue with deletion even if this fails
+    }
+    
+    const [userRows] = await pool.query(
+      'SELECT profile_image FROM users WHERE user_id = ?',
+      [userId]
+    );
+    
+    let profileImagePath = null;
+    if (userRows.length > 0 && userRows[0].profile_image) {
+      profileImagePath = userRows[0].profile_image;
+    }
+    
+    const [result] = await pool.query(
+      'DELETE FROM users WHERE user_id = ?',
+      [userId]
+    );
+    
+    if (result.affectedRows !== 1) {
+      await pool.query('ROLLBACK');
+      return res.status(400).json({ message: 'Failed to delete account' });
+    }
+    
+    if (profileImagePath) {
+      try {
+        const fullPath = path.join(__dirname, '..', 'public', profileImagePath.startsWith('/') ? profileImagePath.substring(1) : profileImagePath);
+        if (fs.existsSync(fullPath)) {
+          fs.unlinkSync(fullPath);
+        }
+      } catch (error) {
+        console.error('Failed to delete profile image:', error);
+        // Continue with deletion even if this fails
+      }
+    }
+    
+    await pool.query('COMMIT');
+    res.json({ message: 'Account deleted successfully' });
+    
+  } catch (error) {
+    await pool.query('ROLLBACK');
+    console.error('Error deleting user account:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
   getUserProfile,
   updateUserProfile,
   getUsers,
-  getUserById
+  getUserById,
+  deleteUser
 };
