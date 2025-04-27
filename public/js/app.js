@@ -11,11 +11,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    /* ---------- Sanitation helper utilities ---------- */
     const sanitize = str => {
         const div = document.createElement('div');
         div.textContent = str;
-        return div.innerHTML;           // encoded version
+        return div.innerHTML;           
     };
 
 
@@ -42,7 +41,6 @@ document.addEventListener('DOMContentLoaded', () => {
         formEl.querySelectorAll('.error').forEach(input => input.classList.remove('error'));
     };
 
-    /* ------------------------------------------- */
 
 
 
