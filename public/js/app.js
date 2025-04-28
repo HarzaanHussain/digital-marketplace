@@ -1618,6 +1618,10 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="category-name">${sanitize(category.name)}</div>
         `;
 
+        card.addEventListener('click', () => {
+            navigateTo('browse', { categoryId: category.category_id });
+          });
+
         return card;
     }
 

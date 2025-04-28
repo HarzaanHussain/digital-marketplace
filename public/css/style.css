@@ -1172,3 +1172,64 @@ footer {
     gap: 0.5rem;
     margin-left: 1rem;
   }
+
+/* Uniform Buttons / cards  */
+ 
+/*  Depth & motion on all cards */
+.item-card,
+.category-card,
+.alert-card,
+.purchase-card,
+.sale-card,
+.review-card {
+  transition: transform .18s cubic-bezier(.4,.2,.2,1),
+              box-shadow .18s;
+}
+.item-card:hover,
+.category-card:hover,
+.alert-card[data-item-id]:hover,
+.purchase-card:hover:not(.item-deleted),
+.sale-card:hover:not(.item-deleted) {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 6px 20px rgba(0,0,0,.12);
+}
+
+/* Unify button look (keeps hero pills untouched) */
+.btn{
+  font-weight:600;
+  padding:.45rem 1.1rem;
+  border-radius:.5rem;
+  box-shadow:0 2px 5px rgba(0,0,0,.08);
+  transition:background .18s,transform .15s,box-shadow .15s;
+}
+.btn:hover   {transform:translateY(-2px);box-shadow:0 4px 10px rgba(0,0,0,.12);}
+.btn:active  {transform:translateY(0);   box-shadow:0 1px 4px  rgba(0,0,0,.15);}
+.btn:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}
+
+/* colour variants */
+.btn-primary  {background:var(--primary-color);   color:#fff}
+.btn-secondary{background:var(--secondary-color); color:#fff}
+.btn-danger   {background:var(--danger-color);    color:#fff}
+.btn-primary:hover  {background:var(--primary-color-hover)}
+.btn-secondary:hover{background:#5a6268}
+.btn-danger:hover   {background:#c82333}
+
+/* Field-error shake so users notice mainly on sell form */
+@keyframes nudge{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(2px)}}
+input.error,textarea.error,select.error{animation:nudge .3s}
+
+/*  Alert helper label without layout shift */
+.alert-card[data-item-id]{
+  position:relative;        /* create stacking context */
+}
+.alert-card[data-item-id]::after{
+  content:\"Click to view item\";
+  position:absolute;
+  right:4.5rem; top:50%; transform:translateY(-50%);
+  font-size:.8rem; color:#666;
+  pointer-events:none;      /* so card still receives click */
+  opacity:0; transition:opacity .15s;
+}
+.alert-card[data-item-id]:hover::after,
+.alert-card[data-item-id]:focus-within::after{opacity:1}
+
