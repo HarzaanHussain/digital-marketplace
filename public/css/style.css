@@ -1233,3 +1233,76 @@ input.error,textarea.error,select.error{animation:nudge .3s}
 .alert-card[data-item-id]:hover::after,
 .alert-card[data-item-id]:focus-within::after{opacity:1}
 
+
+
+/* 1. Lock every thumbnail to 16:9 so cards never jump around */
+.item-image img,
+.category-card img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+/* 2. Hero: gentle gradient + center your content on ultra-wide screens */
+.hero {
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-color-hover));
+}
+.hero .hero-content {
+  max-width: 1200px;
+  margin-inline: auto;
+}
+
+/* 3. Improve readability of item titles */
+.item-title {
+  line-height: 1.3;
+}
+
+/* 4. Make category names consistently capitalized */
+.category-card .category-name {
+  text-transform: capitalize;
+}
+
+/* 5. Subtle icon “pop” on category-card hover */
+.category-card .category-icon {
+  transition: transform .2s ease;
+}
+.category-card:hover .category-icon {
+  transform: scale(1.1);
+}
+
+/* 6. Center your grid on very wide screens */
+.items-grid {
+  max-width: 1200px;
+  margin-inline: auto;
+}
+
+/* 7. Wrap category grid at tablet widths */
+@media (max-width: 1024px) {
+  .category-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+}
+
+/* 1) Fade in only the headline & subhead with motion */
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .hero h2,
+  .hero p {
+    opacity: 0;
+    animation: fadeInUp 0.6s ease forwards;
+  }
+  .hero h2 { animation-delay: 0.2s; }
+  .hero p  { animation-delay: 0.4s; }
+  
+  /* 2) Fade in buttons with opacity only (no transform) */
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  .hero .btn {
+    opacity: 0;
+    animation: fadeIn 0.4s ease forwards;
+    animation-delay: 0.6s;
+  }
