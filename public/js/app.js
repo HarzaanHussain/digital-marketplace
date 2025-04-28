@@ -338,6 +338,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Update active nav link
         updateActiveNavLink(page);
+
+         // jump back up to the top on every new page
+         window.scrollTo({ top: 0, behavior: 'auto' });
     }
 
     // Update the active navigation link
