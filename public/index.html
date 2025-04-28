@@ -96,66 +96,84 @@
         </section>
     </template>
 
-    <!-- Item Detail Template -->
+     <!-- Item Detail Template -->
     <template id="item-detail-template">
         <section class="item-detail section">
-            <div class="item-header">
-                <button class="btn btn-secondary" id="back-button"><i class="fas fa-arrow-left"></i> Back</button>
-                <h2 id="item-title">Item Title</h2>
+      
+          <!-- header + back -->
+          <div class="item-header">
+            <button class="btn btn-secondary" id="back-button">
+              <i class="fas fa-arrow-left"></i> Back
+            </button>
+            <h2 id="item-title">Item Title</h2>
+          </div>
+      
+          <!-- full-width description -->
+          <p id="item-description" class="item-description">
+            Item description goes here…
+          </p>
+      
+          <div class="item-content">
+      
+            <!-- image -->
+            <div class="item-image">
+              <img id="item-thumbnail" src="" alt="Item Thumbnail">
             </div>
-            
-            <div class="item-content">
-                <div class="item-image">
-                    <img id="item-thumbnail" src="" alt="Item Thumbnail">
-                </div>
-                
-                <div class="item-info">
-                    <p id="item-description">Description</p>
-                    
-                    <div class="item-meta">
-                        <p><strong>Category:</strong> <span id="item-category">Category</span></p>
-                        <p><strong>Seller:</strong> <span id="item-seller">Seller</span></p>
-                        <p><strong>Price:</strong> <span id="item-price">$0.00</span></p>
-                    </div>
-                    
-                    <div class="item-actions">
-                        <button id="purchase-button" class="btn btn-primary auth-required hidden">Purchase</button>
-                        <button id="set-alert-button" class="btn btn-secondary auth-required hidden">Set Price Alert</button>
-                    </div>
-                </div>
+      
+            <!-- info panel -->
+            <div class="item-info">
+              <div class="item-meta">
+                <p><strong>Category:</strong> <span id="item-category"></span></p>
+                <p><strong>Seller:</strong> <span id="item-seller"></span></p>
+                <p><strong>Price:</strong> <span id="item-price">$0.00</span></p>
+              </div>
+              <div class="item-actions">
+                <button id="purchase-button" class="btn btn-primary auth-required hidden">
+                  Purchase
+                </button>
+                <button id="set-alert-button" class="btn btn-secondary auth-required hidden">
+                  Set Price Alert
+                </button>
+                <button id="delete-button" class="btn btn-danger">
+                  Delete Item
+                </button>
+              </div>
             </div>
-            
-            <div class="item-reviews">
-                <h3>Reviews</h3>
-                <div id="reviews-container">
-                    <!-- Reviews will be loaded dynamically -->
+      
+          </div>
+      
+          <!-- reviews -->
+          <div class="item-reviews">
+            <h3>Reviews</h3>
+            <div id="reviews-container"></div>
+      
+            <div class="add-review auth-required hidden">
+              <h4>Add a Review</h4>
+              <form id="review-form">
+                <div class="rating-select">
+                  <span>Rating:</span>
+                  <div class="star-rating">
+                    <i class="fas fa-star" data-rating="1"></i>
+                    <i class="fas fa-star" data-rating="2"></i>
+                    <i class="fas fa-star" data-rating="3"></i>
+                    <i class="fas fa-star" data-rating="4"></i>
+                    <i class="fas fa-star" data-rating="5"></i>
+                  </div>
+                  <input type="hidden" id="rating-input" value="5">
                 </div>
-                
-                <div class="add-review auth-required hidden">
-                    <h4>Add a Review</h4>
-                    <form id="review-form">
-                        <div class="rating-select">
-                            <span>Rating: </span>
-                            <div class="star-rating">
-                                <i class="fas fa-star" data-rating="1"></i>
-                                <i class="fas fa-star" data-rating="2"></i>
-                                <i class="fas fa-star" data-rating="3"></i>
-                                <i class="fas fa-star" data-rating="4"></i>
-                                <i class="fas fa-star" data-rating="5"></i>
-                            </div>
-                            <input type="hidden" id="rating-input" value="5">
-                        </div>
-                        
-                        <div class="form-group">
-                            <textarea id="review-comment" rows="3" placeholder="Write your review..."></textarea>
-                        </div>
-                        
-                        <button type="submit" class="btn btn-primary">Submit Review</button>
-                    </form>
+                <div class="form-group">
+                  <textarea id="review-comment" rows="3" placeholder="Write your review…"></textarea>
                 </div>
+                <button type="submit" class="btn btn-primary">
+                  Submit Review
+                </button>
+              </form>
             </div>
+          </div>
+      
         </section>
-    </template>
+      </template>
+      
 
     <!-- Login Template -->
     <template id="login-template">
