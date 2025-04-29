@@ -61,7 +61,7 @@ const createReview = async (req, res) => {
     
     // Check if item exists and is not deleted
     const [itemRows] = await pool.query(
-      'SELECT * FROM items WHERE item_id = ?', // Removed is_deleted check to allow reviews for purchased but deleted items
+      'SELECT * FROM items WHERE item_id = ?', 
       [item_id]
     );
     

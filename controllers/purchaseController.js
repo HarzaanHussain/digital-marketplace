@@ -16,7 +16,7 @@ const createPurchase = async (req, res) => {
       return res.status(400).json({ message: 'Please provide an item ID' });
     }
     
-    // Get item details - make sure it's not deleted
+    // Get item details  make sure it's not deleted
     const [itemRows] = await pool.query(
       'SELECT * FROM items WHERE item_id = ? AND is_deleted = false',
       [item_id]
@@ -136,7 +136,6 @@ const getUserPurchases = async (req, res) => {
       [req.user.user_id, limit, offset]
     );
     
-    // FIXED: Get total count with a separate query
     const [countResult] = await pool.query(
       'SELECT COUNT(*) as total FROM purchases WHERE buyer_id = ?',
       [req.user.user_id]
@@ -181,7 +180,6 @@ const getUserSales = async (req, res) => {
       [req.user.user_id, limit, offset]
     );
     
-    // FIXED: Get total count with a separate query
     const [countResult] = await pool.query(
       `SELECT COUNT(*) as total 
        FROM purchases p
@@ -274,15 +272,12 @@ const downloadPurchasedItem = async (req, res) => {
     // Improved file path handling
     let filePath;
     
-    // Case 1: Absolute path
     if (path.isAbsolute(purchase.file_path)) {
       filePath = purchase.file_path;
     } 
-    // Case 2: Relative path starting with /
     else if (purchase.file_path.startsWith('/')) {
       filePath = path.join(__dirname, '..', 'public', purchase.file_path.substring(1));
     } 
-    // Case 3: Relative path without /
     else {
       filePath = path.join(__dirname, '..', 'public', purchase.file_path);
     }

@@ -584,6 +584,10 @@ const deleteItem = async (req, res) => {
         'DELETE FROM user_alerts WHERE item_id = ?',
         [req.params.id]
       );
+      await pool.query(
+        'DELETE FROM reviews WHERE item_id = ?',
+        [req.params.id]
+      );
       
       // Delete the file from filesystem if no purchases
       if (item.file_path) {

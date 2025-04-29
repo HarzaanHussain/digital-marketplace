@@ -9,6 +9,6 @@ const {
 
 router.get('/', getCategories);
 router.get('/:id', getCategoryById);
-router.post('/', protect, createCategory); // In a real app, you'd add isAdmin middleware
+router.post('/', protect, createCategory); 
 
 module.exports = router;
