@@ -24,7 +24,6 @@ const registerUser = async (req, res) => {
     
     const { username, email, password, full_name } = req.body;
 
-    // Enhanced validation
     if (!username || username.trim() === '') {
       await pool.query('ROLLBACK');
       return res.status(400).json({ message: 'Username is required' });
