@@ -573,7 +573,6 @@ const deleteItem = async (req, res) => {
     );
     
     if (purchaseRows.length > 0) {
-      // Item has been purchased, so mark as deleted instead of removing completely
       await pool.query(
         'UPDATE items SET is_deleted = true WHERE item_id = ?',
         [req.params.id]
